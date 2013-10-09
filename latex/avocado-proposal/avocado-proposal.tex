@@ -84,6 +84,12 @@ languages. By defining a straightforward data structure that is easily serialize
 of needing to parse SAM/BAM files. We plan to update SNAP to support output using ADAM datatypes; in the meanwhile,
 we can convert SAM/BAM files to ADAM through the use of the ADAM toolkit \cite{adam}.
 
+A notable feature that we are implementing in ADAM for AVOCADO is pileup compression. Normally, reference oriented data is
+stored in a conservative manner that retains full statistics for each base at the reference position. Instead, we plan to reduce the
+data for like bases down into a single record. As a critical application for this variant caller is high-coverage (60$\times$) cancer
+genomes, this may provide a significant reduction in the amount of data that needs to be distributed in our system, and may lead
+to significant performance improvement.
+
 \subsection{Data Filtering}
 \label{sec:data-filtering}
 
@@ -151,6 +157,9 @@ One of the inherent goals of this project is to produce a variant caller that ha
 extended. We hope that this will enable the rapid development and prototyping of future variant calling algorithms. From
 a software engineering standpoint, we will achieve this by presenting clear interfaces for defining new filters and variant
 calling algorithms for both read and pileup oriented data.
+
+\subsection{Joint Variant Calling with Sufficient Statistics}
+\label{sec:joint-variant-calling}
 
 \section{Filtering and Calling Heuristics}
 \label{sec:filtering-calling}
@@ -235,6 +244,17 @@ machine to a distributed system running on a cluster. This opens us up to severa
 tradeoffs of interest might include finding the minimal cost configuration for variant calling, or finding the system that provides
 the lowest end-to-end latency (independent of cost or scaling efficiency).
 
+\subsection{Computational Cost of Joint Variant Calling}
+\label{sec:computational-cost-joint}
+
+One of the major contributions of our work is that we plan to calculate population statistics offline and catalog them in a database.
+The GATK \cite {mckenna10} and SAMtools \cite{li11} both implement population statistics calculation as an online operation. The
+impact of performing joint variant calling in this manner is that if a single sample is added to a population, the entire population
+must be reanalyzed before calling variants on this single sample. This has significant cost for large populations, and we hope to
+replace this large cost that grows with population size with a single, fixed latency cost. With this feature, we will need to characterize
+the tradeoff at which it becomes more performant to perform offline calculation, as well as any accuracy impact of performing offline
+analysis.
+
 \subsection{Order of Work}
 \label{sec:order-of-work}
 
@@ -245,10 +265,13 @@ We plan to conduct our work in the following order:
 \begin{enumerate}
 \item SNP Calling (see \S\ref{sec:SNP-calling})
 \item Local assembly (see \S\ref{sec:local-assembly})
+\item Sufficient statistics calculation (see \S\ref{sec:joint-variant-calling})
 \end{enumerate}
+\item Joint variant calling for SNPs using sufficient statistics (see \S\ref{sec:joint-variant-calling})
 \item Short Indel detection (see \S\ref{sec:short-indel})
 \item Long Indel detection (see \S\ref{sec:long-indel}) using a split-read aligner
 \item Enhancements to SNAP to add the ability to perform split-read alignment
+\item Joint variant calling for structural variants (see \S\ref{sec:joint-variant-calling})
 \end{itemize}
 
 \small
