@@ -11,7 +11,7 @@
 \begin{document}
 
 \title{AVOCADO: A Variant Caller, Distributed}
-%\author{Frank Austin Nothaft}
+\author{Peter Jin, Brielin Brown, Frank Austin Nothaft}
 \maketitle
 
 \begin{abstract}
@@ -29,21 +29,36 @@ segments of DNA, and to choose algorithms that are optimized for specific struct
 \section{Introduction}
 \label{sec:introduction}
 
-Enabled by the rapid drop in the cost of sequencing a genome \cite{nhgri}, many fields of medicine are embracing genomic
+Enabled by the rapid drop in the cost of sequencing a genome~\cite{nhgri}, many fields of medicine are embracing genomic
 data in both research and treatment practice. After this data is collected, it must be processed through an alignment and
-variant calling pipeline. Although the performance of current variant callers like SAMtools \cite{li11} and GATK \cite {mckenna10}
+variant calling pipeline. Although the performance of current variant callers like SAMtools~\cite{li11} and GATK~\cite{mckenna10}
 is improving, it is not maintaining pace with the increased performance and reduced cost of sequencing tools. We will add more
 detail to this section as we implement the algorithm.
 
 We propose a new variant caller architecture that is easy to extend, and that is optimized for high performance
-and scalability. We employ efficient data serialization/deserialization techniques \cite{adam} and an in-memory distributed
-computing architecture \cite{zaharia10} to reduce I/O costs during variant calling. Additionally, we leverage the filtering techniques
-introduced by GQL \cite{kozanitis13} to eliminate irrelevant data and reduce the size of the dataset that we are processing.
+and scalability. We employ efficient data serialization/deserialization techniques~\cite{adam} and an in-memory distributed
+computing architecture~\cite{zaharia10} to reduce I/O costs during variant calling. Additionally, we leverage the filtering techniques
+introduced by GQL~\cite{kozanitis13} to eliminate irrelevant data and reduce the size of the dataset that we are processing.
 We believe that data filtering will not have an adverse impact on accuracy, and may even reduce the number of spurious
-variant calls; we discuss the rationale for this further in \S\ref{sec:data-filtering}. A significant
+variant calls; we discuss the rationale for this further in~\S\ref{sec:data-filtering}. A significant
 advantage enabled by filtering is that we can tailor the algorithm we are using to call variants to the complexity of the
 adjacent location in the genome. This allows us to use less computationally expensive algorithms to call variants in
-low complexity areas. We discuss the heuristics that we will use for filtering in the subsections of \S\ref{sec:filtering-calling}.
+low complexity areas. We discuss the heuristics that we will use for filtering in the subsections of~\S\ref{sec:filtering-calling}.
+
+Our project will contribute the following to the state-of-the-art in variant calling:
+
+\begin{itemize}
+\item The use of extensive data filtering operations that allows us to select local assembly~(\S\ref{sec:local-assembly}) for
+variant calling in complex regions and to select less computationally complex algorithms in other regions. This will improve
+system performance, and will hopefully not impact accuracy.
+\item The introduction of sufficient statistics for joint variant calling~(\S\ref{sec:joint-variant-calling}). This technique allows
+us to replace repetitive computation with a database access.
+\item The introduction of the new ADAM data formats~(\S\ref{sec:io}). These formats present significant improvements over the
+SAM/BAM/VCF formats in performance, size, and semantics and will enable improved distributed system scalability.
+\item The creation of a variant calling pipeline that is both modular and open source. The current state-of-the-art variant calling
+toolchain (GATK) is released under a restrictive license. The lack of an open source system to build on limits research in the area
+of variant calling by creating a large barrier to entry.
+\end{itemize}
 
 \section{Architecture}
 \label{sec:architecture}
@@ -63,7 +78,7 @@ pileup-based variant calling algorithms.
 
 Logically, the system can be decomposed into three functions: input/out\-put, data filtering, and variant calling. The rest of this
 section will give an overview of each of these three functions. The algorithms that support filtering and variant calling are not
-discussed in this section --- instead, we will discuss them further in \S\ref{sec:filtering-calling}. We will also discuss how the
+discussed in this section --- instead, we will discuss them further in~\S\ref{sec:filtering-calling}. We will also discuss how the
 architecture of the system lends itself to easy extension.
 
 \subsection{Input/Output}
@@ -82,7 +97,7 @@ We gain several additional advantages through the use of Avro. Avro allows us to
 language. Once the data structure has been defined using the markup, it can be reused across most major programming
 languages. By defining a straightforward data structure that is easily serialized and deserialized, we also eliminate the overhead
 of needing to parse SAM/BAM files. We plan to update SNAP to support output using ADAM datatypes; in the meanwhile,
-we can convert SAM/BAM files to ADAM through the use of the ADAM toolkit \cite{adam}.
+we can convert SAM/BAM files to ADAM through the use of the ADAM toolkit~\cite{adam}.
 
 A notable feature that we are implementing in ADAM for AVOCADO is pileup compression. Normally, reference oriented data is
 stored in a conservative manner that retains full statistics for each base at the reference position. Instead, we plan to reduce the
@@ -94,21 +109,21 @@ to significant performance improvement.
 \label{sec:data-filtering}
 
 One of the critical findings of the GQL project was that we can achieve a significant speedup in variant calling by eliminating
-data that is unlikely to contain a structural variant \cite{kozanitis13}. In AVOCADO, we look to extend this approach further by treating
+data that is unlikely to contain a structural variant~\cite{kozanitis13}. In AVOCADO, we look to extend this approach further by treating
 data filtering and segregation as a key part of successful variant calling. This work is predicated under several assumptions:
 
 \begin{itemize}
 \item With the exception of 10\% of the genome that contains high redundancy, structural variants can be called without
-using based assembly techniques \cite{xia09}. For these remaining structural variants, there is a negligible accuracy
+using based assembly techniques~\cite{xia09}. For these remaining structural variants, there is a negligible accuracy
 tradeoff that comes from using algorithms that increase statistical rigor at the cost of computation.
 \item Within the remaining 90\% of the genome, the majority of loci do not contain evidence of structural variants and
-can be discarded without significantly impacting accuracy \cite{kozanitis13}.
+can be discarded without significantly impacting accuracy~\cite{kozanitis13}.
 \item For the remaining regions that may contain evidence of variants, we can determine what sort of structural variant they
 are likely to contain (SNP, short index), and optimize both accuracy and computational cost by picking algorithms tailored
 to those specific structural variants.
 \end{itemize}
 
-We provision three stages for the filtering of data. As alluded to in \S\ref{sec:io}, we perform basic filtering on the input reads.
+We provision three stages for the filtering of data. As alluded to in~\S\ref{sec:io}, we perform basic filtering on the input reads.
 This first round of filtering will be based on the read quality. The second round of filtering will look to identify segments of the
 genome which need to be called using read-assembly based methods. After this round of filtering, we segregate the genome
 into two pipelines --- one for read-based identification, and another for pileup-based variant identification. In each of these
@@ -124,9 +139,9 @@ those variants.
 \subsection{Variant Calling}
 \label{sec:variant-calling}
 
-As discussed in \S\ref{sec:data-filtering}, we plan to include several variant calling algorithms. At the moment, we plan to
-implement the algorithms identified in Table \ref{tab:vc-algorithms}. A further discussion of these algorithms can be found
-in \S\ref{sec:filtering-calling}.
+As discussed in~\S\ref{sec:data-filtering}, we plan to include several variant calling algorithms. At the moment, we plan to
+implement the algorithms identified in Table~\ref{tab:vc-algorithms}. A further discussion of these algorithms can be found
+in~\S\ref{sec:filtering-calling}.
 
 \begin{table}[h]
 \begin{center}
@@ -146,7 +161,7 @@ Short Indel & \\
 
 A consequence of having several different algorithms is that we will need to join the output of all algorithms at the end.
 A na\"{i}ve approach is to pick the result generated by the ``most rigorous'' variant calling algorithm. However, since the
-purpose of the filtering steps discussed in \S\ref{sec:data-filtering} is to send disparate segments of the genome to
+purpose of the filtering steps discussed in~\S\ref{sec:data-filtering} is to send disparate segments of the genome to
 different variant calling algorithms, there should not be any conflicting variant calls. More succinctly, if $VC_{k}$ is the
 set of all variant calls made by algorithm $k$, we expect $VC_{i} \cap VC_{j} = \emptyset$ for all combinations of $i, j$.
 
@@ -218,20 +233,32 @@ Smith-Waterman.
 
 To perform SNP calling, we first identify the likely genotype class\footnote{For diploid human, classes include homozygous
 matching reference, heterozygous with one base matching reference, or no bases matching reference.} using equation~(2)
-from Li et al \cite{li11}. We will filter pileups on the basis of whether they contain any mismatches --- only pileups that contain
-a mismatch will be evaluated.
+from Li et al~\cite{li11}. We will filter pileups on the basis of whether they contain any mismatches --- only pileups that contain
+a mismatch will be evaluated. This algorithm itself can be used for both single sample or joint variant calling. If we are performing
+a joint call, since we are not calculating the population statistics needed for performing joint calling, we will call out to a database
+of population statistics described in~\S\ref{sec:joint-variant-calling}.
+
+One of the significant contributions of this algorithm is that we will rely on a database\footnote{See~\S\ref{sec:sufficient-statistics}.}
+for prior probabilities, instead of performing this calculation at runtime as is done in GATK and SAMtools~\cite{mckenna10, li11}.
+However, to evaluate the performance tradeoffs for this decision, we will also implement a second SNP calling algorithm that is
+based on equation~(19) from Li et al~\cite{li11}. This caller will operate on multiple samples, which will also require a change in
+the filter that is being used. Specifically, we will group all genomes at a specific reference value, identify sections that show SNP
+evidence in at least one sample, and perform the SNP call across all samples.
+
+\section{Sufficient Statistics Collection}
+\label{sec:sufficient-statistics}
 
 \section{Experimental Validation}
 \label{sec:experimental-validation}
 
-We plan to validate this tool using the SMASH benchmarking suite \cite{talwalkar13}. This benchmarking suite will allow us to
+We plan to validate this tool using the SMASH benchmarking suite~\cite{talwalkar13}. This benchmarking suite will allow us to
 compare both performance and accuracy against other high quality variant calling engines.
 
 \subsection{Parallel vs. Distributed}
 \label{sec:parallel-vs-distributed}
 
 This system can be implemented either as a traditional parallel program on a single machine, or as a distributed application
-running on a cluster. It is useful to note that SNAP \cite{zaharia11} chose to run on a single machine. Our general implementation
+running on a cluster. It is useful to note that SNAP~\cite{zaharia11} chose to run on a single machine. Our general implementation
 is task parallel between the read/reference-oriented calling, and also between algorithms within these two sections. For the
 variant calling algorithms themselves, the Short Indel and SNP callers are clearly data parallel.
 
@@ -248,12 +275,12 @@ the lowest end-to-end latency (independent of cost or scaling efficiency).
 \label{sec:computational-cost-joint}
 
 One of the major contributions of our work is that we plan to calculate population statistics offline and catalog them in a database.
-The GATK \cite {mckenna10} and SAMtools \cite{li11} both implement population statistics calculation as an online operation. The
+The GATK~\cite {mckenna10} and SAMtools~\cite{li11} both implement population statistics calculation as an online operation. The
 impact of performing joint variant calling in this manner is that if a single sample is added to a population, the entire population
 must be reanalyzed before calling variants on this single sample. This has significant cost for large populations, and we hope to
 replace this large cost that grows with population size with a single, fixed latency cost. With this feature, we will need to characterize
 the tradeoff at which it becomes more performant to perform offline calculation, as well as any accuracy impact of performing offline
-analysis.
+analysis. As part of this analysis, we will have to create an additional SNP caller. This is discussed in~\S\ref{sec:SNP-calling}.
 
 \subsection{Order of Work}
 \label{sec:order-of-work}
@@ -263,18 +290,38 @@ We plan to conduct our work in the following order:
 \begin{itemize}
 \item In parallel, we will implement:
 \begin{enumerate}
-\item SNP Calling (see \S\ref{sec:SNP-calling})
-\item Local assembly (see \S\ref{sec:local-assembly})
-\item Sufficient statistics calculation (see \S\ref{sec:joint-variant-calling})
+\item SNP Calling (see~\S\ref{sec:SNP-calling})
+\item Local assembly (see~\S\ref{sec:local-assembly})
+\item Sufficient statistics calculation (see~\S\ref{sec:sufficient-statistics})
 \end{enumerate}
-\item Joint variant calling for SNPs using sufficient statistics (see \S\ref{sec:joint-variant-calling})
-\item Short Indel detection (see \S\ref{sec:short-indel})
-\item Long Indel detection (see \S\ref{sec:long-indel}) using a split-read aligner
+\item Joint variant calling for SNPs using sufficient statistics (see~\S\ref{sec:joint-variant-calling})
+\item Short Indel detection (see~\S\ref{sec:short-indel})
+\item Long Indel detection (see~\S\ref{sec:long-indel}) using a split-read aligner
 \item Enhancements to SNAP to add the ability to perform split-read alignment
-\item Joint variant calling for structural variants (see \S\ref{sec:joint-variant-calling})
+\item Joint variant calling for structural variants (see~\S\ref{sec:joint-variant-calling})
+\end{itemize}
+
+\appendix
+
+\section{Other Collaborators}
+\label{sec:other-collaborators}
+
+In addition to the three students working on this project, we will be assisted by:
+
+\begin{itemize}
+\item Ameet Talwalkar (Postdoc in AMPLAB, statistical/machine learning advice for sufficient statistics in~\S\ref{sec:sufficient-statistics})
+\item Matt Massie (Software Engineering Lead in AMPLAB, creator of ADAM~\cite{adam}, assistance with tools/APIs for I/O
+in~\S\ref{sec:io})
+\item Chris Hartl (Visiting Scientist in AMPLAB from MIT/Harvard Broad, advice on variant calling/genotyping algorithms)
 \end{itemize}
 
 \small
+
+\section{Resources Needed}
+\label{sec:resources-needed}
+
+This project will use computing resources provided through the AMPLAB including computing clusters located at Berkeley and through
+Amazon Elastic Compute 2 (EC2).
 
 \bibliographystyle{acm}
 
