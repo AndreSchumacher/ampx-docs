@@ -51,7 +51,7 @@ Our project will contribute the following to the state-of-the-art in variant cal
 \item The use of extensive data filtering operations that allows us to select local assembly~(\S\ref{sec:local-assembly}) for
 variant calling in complex regions and to select less computationally complex algorithms in other regions. This will improve
 system performance, and will hopefully not impact accuracy.
-\item The introduction of sufficient statistics for joint variant calling~(\S\ref{sec:joint-variant-calling}). This technique allows
+\item The introduction of sufficient statistics for joint variant calling~(\S\ref{sec:sufficient-statistics}). This technique allows
 us to replace repetitive computation with a database access.
 \item The introduction of the new ADAM data formats~(\S\ref{sec:io}). These formats present significant improvements over the
 SAM/BAM/VCF formats in performance, size, and semantics and will enable improved distributed system scalability.
@@ -173,9 +173,6 @@ extended. We hope that this will enable the rapid development and prototyping of
 a software engineering standpoint, we will achieve this by presenting clear interfaces for defining new filters and variant
 calling algorithms for both read and pileup oriented data.
 
-\subsection{Joint Variant Calling with Sufficient Statistics}
-\label{sec:joint-variant-calling}
-
 \section{Filtering and Calling Heuristics}
 \label{sec:filtering-calling}
 
@@ -265,6 +262,10 @@ the known genomes. This will allow faster determination of whether the observed 
 fast fast computation of the confidence of the called genotype. If external information about the genome of interest is know, such as
 population (e.g. Sub-Saharan African, Northern European) or sequencing platform, this can be taken into account by comparing
 against genomes from the same population, and correcting likelihoods for platform based errors. 
+
+Initially, we plan on extending the work of Li ~\cite{Li11}. Though GATK's methods work for SNPs and indels, the published calculations
+are only for SNPs. If time permits, we plan to extend the model to include both SNPs and indels, though we imagine the latter will be much
+more difficult.
 
 \section{Experimental Validation}
 \label{sec:experimental-validation}
