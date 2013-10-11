@@ -1,0 +1,88 @@
+\begin{thebibliography}{10}
+
+\bibitem{bresler13}
+{\sc Bresler, G., Bresler, M., and Tse, D.}
+\newblock Optimal assembly for high throughput shotgun sequencing.
+\newblock {\em BMC Bioinformatics 14}, S18 (2013).
+
+\bibitem{chen09}
+{\sc Chen, K., Wallis, J.~W., McLellan, M.~D., Larson, D.~E., Kalicki, J.~M.,
+  Pohl, C.~S., McGrath, S.~D., Wendl, M.~C., Zhang, Q., Locke, D.~P., et~al.}
+\newblock Breakdancer: an algorithm for high-resolution mapping of genomic
+  structural variation.
+\newblock {\em Nature methods 6}, 9 (2009), 677--681.
+
+\bibitem{kozanitis13}
+{\sc Kozanitis, C., Heiberg, A., Varghese, G., and Bafna, V.}
+\newblock Using genome query language to uncover genetic variation.
+\newblock {\em Bioinformatics\/} (2013).
+
+\bibitem{li11}
+{\sc Li, H.}
+\newblock A statistical framework for {SNP} calling, mutation discovery,
+  association mapping and population genetical parameter estimation from
+  sequencing data.
+\newblock {\em Bioinformatics 27}, 21 (2011), 2987--2993.
+
+\bibitem{li09}
+{\sc Li, H., Handsaker, B., Wysoker, A., Fennell, T., Ruan, J., Homer, N.,
+  Marth, G., Abecasis, G., Durbin, R., et~al.}
+\newblock The sequence alignment/map format and {SAM}tools.
+\newblock {\em Bioinformatics 25}, 16 (2009), 2078--2079.
+
+\bibitem{adam}
+{\sc Massie, M.}
+\newblock {ADAM}: {D}atastore {A}lignment {M}ap.
+\newblock \url{http://www.github.com/massie/adam}.
+
+\bibitem{mckenna10}
+{\sc McKenna, A., Hanna, M., Banks, E., Sivachenko, A., Cibulskis, K.,
+  Kernytsky, A., Garimella, K., Altshuler, D., Gabriel, S., Daly, M., et~al.}
+\newblock The {G}enome {A}nalysis {T}oolkit: a {M}ap{R}educe framework for
+  analyzing next-generation {DNA} sequencing data.
+\newblock {\em Genome research 20}, 9 (2010), 1297--1303.
+
+\bibitem{nhgri}
+{\sc NHGRI}.
+\newblock {DNA} sequencing costs.
+\newblock \url{http://www.genome.gov/sequencingcosts/}.
+
+\bibitem{smith81}
+{\sc Smith, T.~F., and Waterman, M.~S.}
+\newblock Comparison of biosequences.
+\newblock {\em Advances in Applied Mathematics 2}, 4 (1981), 482--489.
+
+\bibitem{talwalkar13}
+{\sc Talwalkar, A., Liptrap, J., Newcomb, J., Hartl, C., Terhorst, J., Curtis,
+  K., Bresler, M., Song, Y., Jordan, M.~I., and Patterson, D.}
+\newblock {SMASH}: A benchmarking toolkit for variant calling.
+
+\bibitem{ukkonen85}
+{\sc Ukkonen, E.}
+\newblock Algorithms for approximate string matching.
+\newblock {\em Information and control 64}, 1 (1985), 100--118.
+
+\bibitem{xia09}
+{\sc Xia, R., Sheehan, S., Zhang, Y., Talwalkar, A., Zaharia, M., Terhorst, J.,
+  Jordan, M., Song, Y.~S., Fox, A., and Patterson, D.}
+\newblock {BIGGIE}: A distributed pipeline for genomic variant calling.
+\newblock 2078--9.
+
+\bibitem{xia12}
+{\sc Xia, R., Sheehan, S., Zhang, Y., Talwalkar, A., Zaharia, M., Terhorst, J.,
+  Jordan, M., Song, Y.~S., Fox, A., and Patterson, D.}
+\newblock {BIGGIE}: A distributed pipeline for genomic variant calling.
+
+\bibitem{zaharia11}
+{\sc Zaharia, M., Bolosky, W.~J., Curtis, K., Fox, A., Patterson, D., Shenker,
+  S., Stoica, I., Karp, R.~M., and Sittler, T.}
+\newblock Faster and more accurate sequence alignment with {SNAP}.
+\newblock {\em arXiv preprint arXiv:1111.5572\/} (2011).
+
+\bibitem{zaharia10}
+{\sc Zaharia, M., Chowdhury, M., Franklin, M.~J., Shenker, S., and Stoica, I.}
+\newblock Spark: cluster computing with working sets.
+\newblock In {\em Proceedings of the 2nd USENIX conference on Hot topics in
+  cloud computing\/} (2010), pp.~10--10.
+
+\end{thebibliography}

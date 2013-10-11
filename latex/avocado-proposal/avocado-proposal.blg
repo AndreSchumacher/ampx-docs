@@ -1,0 +1,50 @@
+This is BibTeX, Version 0.99d (TeX Live 2011)
+Capacity: max_strings=35307, hash_size=35307, hash_prime=30011
+The top-level auxiliary file: avocado-proposal.aux
+The style file: acm.bst
+Database file #1: avocado-proposal.bib
+Warning--empty journal in talwalkar13
+Warning--empty journal in xia09
+Warning--empty journal in xia12
+You've used 15 entries,
+            2253 wiz_defined-function locations,
+            610 strings with 6951 characters,
+and the built_in function-call counts, 6158 in all, are:
+= -- 547
+> -- 475
+< -- 0
++ -- 196
+- -- 178
+* -- 557
+:= -- 1075
+add.period$ -- 43
+call.type$ -- 15
+change.case$ -- 131
+chr.to.int$ -- 0
+cite$ -- 18
+duplicate$ -- 143
+empty$ -- 357
+format.name$ -- 178
+if$ -- 1179
+int.to.chr$ -- 0
+int.to.str$ -- 15
+missing$ -- 13
+newline$ -- 76
+num.names$ -- 30
+pop$ -- 127
+preamble$ -- 1
+purify$ -- 116
+quote$ -- 0
+skip$ -- 96
+stack$ -- 0
+substring$ -- 292
+swap$ -- 33
+text.length$ -- 0
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 60
+warning$ -- 3
+while$ -- 47
+width$ -- 17
+write$ -- 140
+(There were 3 warnings)

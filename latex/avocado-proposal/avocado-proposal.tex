@@ -186,6 +186,12 @@ Local assembly will be used in areas of high genomic complexity\footnote{These c
 repeats, areas that are redundant/repeated in the genome, or areas with large structural variants.} to perform very accurate
 structural variant calling. It is useful to note that this the highest accuracy method used in the GATK's HaplotypeCaller.
 
+Unfortunately, there is little published information about the specific algorithm used by HaplotypeCaller, making it difficult to
+reproduce in our system for comparison purposes. We hope to gain some insight into their methods via our discussion with
+Broad engineers. There are several local assembly algorithms that can be used in this step, for instance the MULTIBRIDGING
+algorithm of Bressler ~\cite{bresler13}. We intend to explore the tradeoffs between different de novo assembly algorithms, 
+perhaps choosing the best one based on criteria such as read length, coverage depth, and repetitiveness.
+
 There are several heuristics that can be used for identifying high genomic complexity. A primary heuristic is read mapping
 quality --- if there are many reads that are poorly mapped, this can indicate that the location has high similarity to other
 regions in the genome and is hard to differentiate, or that the reads are mapping poorly to the reference due to a structural
@@ -248,6 +254,18 @@ evidence in at least one sample, and perform the SNP call across all samples.
 \section{Sufficient Statistics Collection}
 \label{sec:sufficient-statistics}
 
+In the current implementation of GATK and SAMTools, it is recommended that the user download sets of reads from other genomes
+to process with the genome of interest. The performance of both the HaplotypeCaller and mpileup improve greatly when able
+to jointly process multiple samples. In recent years, the number of available samples has grown to the point where there are
+more available samples than can be efficiently analyzed all together.
+
+As part of this work, we plan on creating a database wherein the results of computing genotype statistics on many available genomes
+are stored. When a new genome of interest is to be analyzed, the content of the reads covering each location will be compared against
+the known genomes. This will allow faster determination of whether the observed variation is true or due to sequencing error and
+fast fast computation of the confidence of the called genotype. If external information about the genome of interest is know, such as
+population (e.g. Sub-Saharan African, Northern European) or sequencing platform, this can be taken into account by comparing
+against genomes from the same population, and correcting likelihoods for platform based errors. 
+
 \section{Experimental Validation}
 \label{sec:experimental-validation}
 
@@ -274,7 +292,7 @@ the lowest end-to-end latency (independent of cost or scaling efficiency).
 \subsection{Computational Cost of Joint Variant Calling}
 \label{sec:computational-cost-joint}
 
-One of the major contributions of our work is that we plan to calculate population statistics offline and catalog them in a database.
+As discussed previously, we plan to calculate population statistics offline and catalog them in a database.
 The GATK~\cite {mckenna10} and SAMtools~\cite{li11} both implement population statistics calculation as an online operation. The
 impact of performing joint variant calling in this manner is that if a single sample is added to a population, the entire population
 must be reanalyzed before calling variants on this single sample. This has significant cost for large populations, and we hope to
