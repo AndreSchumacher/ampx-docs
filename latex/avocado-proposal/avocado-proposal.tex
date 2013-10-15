@@ -186,8 +186,11 @@ structural variant calling. It is useful to note that this the highest accuracy 
 Unfortunately, there is little published information about the specific algorithm used by HaplotypeCaller, making it difficult to
 reproduce in our system for comparison purposes. We hope to gain some insight into their methods via our discussion with
 Broad engineers. There are several local assembly algorithms that can be used in this step, for instance the MULTIBRIDGING
-algorithm of Bressler ~\cite{bresler13}. We intend to explore the tradeoffs between different de novo assembly algorithms, 
-perhaps choosing the best one based on criteria such as read length, coverage depth, and repetitiveness.
+algorithm of Bressler~\cite{bresler13}, and the active region methods presented by Carnevali et al~\cite{carnevali12}.
+We intend to explore the tradeoffs between different local assembly algorithms, perhaps choosing the best one based
+on criteria such as read length, coverage depth, and repetitiveness. We hope to arrive at an algorithm that blends the strong
+points of already known algorithms with more advanced heuristic k-mer graph techniques like read threading, mate pair
+threading, and spur removal.
 
 There are several heuristics that can be used for identifying high genomic complexity. A primary heuristic is read mapping
 quality --- if there are many reads that are poorly mapped, this can indicate that the location has high similarity to other
@@ -227,9 +230,12 @@ $$
 \end{enumerate}
 
 As has been noted, the Ukkonen algorithm for string matching is more efficient than the Smith-Waterman
-algorithm~\cite{ukkonen85}. This is the algorithm used in SNAP~\cite{zaharia11}. I am currently looking into the SNAP
+algorithm~\cite{ukkonen85}. This is the algorithm used in SNAP~\cite{zaharia11}. We are currently looking into the SNAP
 code to identify whether any algorithmic changes would need to be made to use Ukkonen's algorithm in place of
-Smith-Waterman.
+Smith-Waterman. At this moment, we have not decided on a gap penalty to use. As the goal for the platform is easy
+extensibility~(see~\S\ref{sec:extensibility-and-scalability}) we will design the short indel detection module to
+accommodate several different gap scoring schemes including constant, affine, and profile scoring. This will also allow
+us to explore the gap scoring design space.
 
 \subsection{SNP Calling}
 \label{sec:SNP-calling}
@@ -263,7 +269,7 @@ fast fast computation of the confidence of the called genotype. If external info
 population (e.g. Sub-Saharan African, Northern European) or sequencing platform, this can be taken into account by comparing
 against genomes from the same population, and correcting likelihoods for platform based errors. 
 
-Initially, we plan on extending the work of Li ~\cite{Li11}. Though GATK's methods work for SNPs and indels, the published calculations
+Initially, we plan on extending the work of Li et al~\cite{li11}. Though GATK's methods work for SNPs and indels, the published calculations
 are only for SNPs. If time permits, we plan to extend the model to include both SNPs and indels, though we imagine the latter will be much
 more difficult.
 
