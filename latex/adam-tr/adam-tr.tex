@@ -1,0 +1,52 @@
+\documentclass[11pt,twocolumn]{article}
+\topmargin=0.0in %length of margin at the top of the page (1 inch added by default)
+\oddsidemargin=0.0in %length of margin on sides for odd pages
+\evensidemargin=0in %length of margin on sides for even pages
+\textwidth=6.5in %How wide you want your text to be
+\marginparwidth=0.5in
+\headheight=0pt %1in margins at top and bottom (1 inch is added to this value by default)
+\headsep=0pt %Increase to increase white space in between headers and the top of the page
+\textheight=9.1in %How tall the text body is allowed to be on each page
+
+\usepackage{url}
+\usepackage{graphicx}
+\usepackage{authblk}
+
+\widowpenalty=500
+\clubpenalty=500
+
+\date{}
+
+\begin{document}
+
+\title{ADAM: Genomics Formats and Processing Patterns for Cloud Scale Computing}
+\author[1]{Matt~Massie}
+\author[1]{Frank~Austin~Nothaft}
+\author[2]{Chris~Hartl}
+\author[1]{Christos~Kozanitis}
+\author[1]{David~Patterson}
+\affil[1]{Department of Computer Science, University of California, Berkeley}
+\affil[2]{The Broad Institute of MIT and Harvard}
+
+\maketitle
+
+\abstract
+
+Current genomics applications are dominated by the movement of data to and from disk. This data movement pattern
+is a significant bottleneck that prevents these applications from scaling well to distributed computing clusters. In this report,
+we introduce a new set of data formats for genomics applications that are designed for in-memory MapReduce processing.
+These formats improve application performance, data storage efficiency, and programmer productivity.
+
+\section{Introduction}
+\label{sec:introduction}
+
+The process of transforming reads from alignment to variant-calling ready reads involves several processing stages including
+duplicate marking, base score quality recalibration, and local realignment. Traditionally, these stages have involved reading
+a Sequence/Binary Alignment Map (SAM/BAM) file, performing transformations on the data, and writing this data back out to
+disk as a new SAM/BAM file~\cite{li09}.
+
+\bibliographystyle{acm}
+
+\bibliography{adam-tr}
+
+\end{document}
