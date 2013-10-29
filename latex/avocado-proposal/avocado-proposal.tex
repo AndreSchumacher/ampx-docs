@@ -56,8 +56,7 @@ us to replace repetitive computation with a database access.
 \item The introduction of the new ADAM data formats~(\S\ref{sec:io}). These formats present significant improvements over the
 SAM/BAM/VCF formats in performance, size, and semantics and will enable improved distributed system scalability.
 \item The creation of a variant calling pipeline that is both modular and open source. The current state-of-the-art variant calling
-toolchain (GATK) is released under a restrictive license. The lack of an open source system to build on limits research in the area
-of variant calling by creating a large barrier to entry.
+toolchain (GATK) is mixed-source and does not have peer-reviewed literature available on all of its algorithms.
 \end{itemize}
 
 \section{Architecture}
@@ -258,14 +257,14 @@ evidence in at least one sample, and perform the SNP call across all samples.
 \label{sec:sufficient-statistics}
 
 In the current implementation of GATK and SAMTools, it is recommended that the user download sets of reads from other genomes
-to process with the genome of interest. The performance of both the HaplotypeCaller and mpileup improve greatly when able
+to process with the genome of interest. The performance of both the HaplotypeCaller and mpileup improves greatly when able
 to jointly process multiple samples. In recent years, the number of available samples has grown to the point where there are
-more available samples than can be efficiently analyzed all together.
+more available samples than can be efficiently analyzed together.
 
 As part of this work, we plan on creating a database wherein the results of computing genotype statistics on many available genomes
 are stored. When a new genome of interest is to be analyzed, the content of the reads covering each location will be compared against
 the known genomes. This will allow faster determination of whether the observed variation is true or due to sequencing error and
-fast fast computation of the confidence of the called genotype. If external information about the genome of interest is know, such as
+fast fast computation of the confidence of the called genotype. If external information about the genome of interest is known, such as
 population (e.g. Sub-Saharan African, Northern European) or sequencing platform, this can be taken into account by comparing
 against genomes from the same population, and correcting likelihoods for platform based errors. 
 
