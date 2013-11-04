@@ -1,4 +1,4 @@
-\documentclass[11pt,twocolumn]{article}
+\documentclass[10pt,twocolumn]{article}
 \topmargin=0.0in %length of margin at the top of the page (1 inch added by default)
 \oddsidemargin=0.0in %length of margin on sides for odd pages
 \evensidemargin=0in %length of margin on sides for even pages
@@ -11,9 +11,11 @@
 \usepackage{url}
 \usepackage{graphicx}
 \usepackage{authblk}
+\usepackage{hyperref}
 
 \widowpenalty=500
 \clubpenalty=500
+\setlength{\parskip}{3pt}
 
 \date{}
 
@@ -22,7 +24,7 @@
 \title{ADAM: Genomics Formats and Processing Patterns for Cloud Scale Computing}
 \author[1]{Matt~Massie}
 \author[1]{Frank~Austin~Nothaft}
-\author[2]{Chris~Hartl}
+\author[1,2]{Chris~Hartl}
 \author[1]{Christos~Kozanitis}
 \author[1]{David~Patterson}
 \affil[1]{Department of Computer Science, University of California, Berkeley}
@@ -30,23 +32,400 @@
 
 \maketitle
 
+\raggedbottom
+
 \abstract
 
 Current genomics applications are dominated by the movement of data to and from disk. This data movement pattern
 is a significant bottleneck that prevents these applications from scaling well to distributed computing clusters. In this report,
-we introduce a new set of data formats for genomics applications that are designed for in-memory MapReduce processing.
-These formats improve application performance, data storage efficiency, and programmer productivity.
+we introduce a new set of data formats and programming patterns for genomics applications using in-memory MapReduce
+frameworks. These formats improve application performance, data storage efficiency, and programmer productivity.
 
 \section{Introduction}
 \label{sec:introduction}
 
-The process of transforming reads from alignment to variant-calling ready reads involves several processing stages including
-duplicate marking, base score quality recalibration, and local realignment. Traditionally, these stages have involved reading
-a Sequence/Binary Alignment Map (SAM/BAM) file, performing transformations on the data, and writing this data back out to
-disk as a new SAM/BAM file~\cite{li09}.
+Although the cost of data processing has not historically been an issue for genomic studies, the falling cost of genetic
+sequencing will soon turn computational tasks into a dominant cost~\cite{nhgri}. The process of transforming reads
+from alignment to variant-calling ready reads involves several processing stages including duplicate marking, base
+score quality recalibration, and local realignment. Currently, these stages have involved reading a Sequence/Binary
+Alignment Map~(SAM/BAM) file, performing transformations on the data, and writing this data back out to disk as a
+new SAM/BAM file~\cite{li09}.
+
+Because of the amount of time these transformations spend shuffling data to and from disk, these transformations have become
+the bottleneck in modern variant calling pipelines. It currently takes three days to perform these transformations on a high
+coverage BAM file\footnote{A 250GB BAM file at 30$\times$ coverage. See~\S\ref{sec:applications} for a longer discussion}. By
+rewriting these applications to make use of modern in-memory MapReduce frameworks like Spark~\cite{zaharia10}, these
+transformations can now be completed in FIXME\footnote{FIXME} hours.
+
+In this paper, we introduce ADAM, which is a programming framework and a set of data formats for cloud scale genomic
+processing. These frameworks and formats scale efficiently to modern cloud computing performance, which allows us to
+speedup read translation steps that are required between alignment and variant calling. In this paper, we provide an
+introduction to the data formats~(\S\ref{sec:current-genomics-storage-standards}) and pipelines used to process
+genomes~(\S\ref{sec:genomic-processing-pipelines}), introduce the ADAM formats and data access
+APIs~(\S\ref{sec:data-format-and-api}) and programing model~(\S\ref{sec:in-memory-programming-model}). Finally,
+we review the performance and compression gains we achieve~(\S\ref{sec:performance}), and outline future enhancements
+to ADAM that we are working on~(\S\ref{sec:future-work}).
+
+\section{Current Genomics Storage Standards}
+\label{sec:current-genomics-storage-standards}
+
+The current de facto standard for the storage and processing of genomics data in read format is BAM. BAM is a binary file
+format that implements the SAM standard for read storage~\cite{li09}. BAM files can be operated on in several languages,
+using either the SAMtools~(\cite{li09}, C++), Picard~(\cite{picard}, Java), and Hadoop-BAM~(\cite{niemenmaa12}, Hadoop
+MapReduce through Java) APIs. BAM provides efficient access and compression over the SAM file format, as it's binary
+encoding reduces several fields into a single byte, and eliminates text processing on load. However, the file format has been
+criticized as it is difficult to process --- the three main APIs that implement the format each note that they do not fully implement
+the format due to it's complexity. Additionally, the file format is difficult to use in multiprocessing environments due to it's use
+of a centralized header; the Hadoop-BAM implementation notes that it's scalability is limited to distributed processing
+environments of less than 8 machines.
+
+In response to the growing size of BAM files\footnote{High coverage read files can be approximately 250 GB for a human genome.},
+the CRAM format has been proposed as a standard for archival purposes~\cite{fritz11}. This format is a binary format that implements
+similar fields as BAM but with better compression. Lossy compression is achieved by only storing differences from the reference, and
+by binning quality scores to reduce the amount of data that needs to be saved. This format provides it's own API, and has some
+compatibility with the existing Picard API for Java.
+
+\section{Genomic Processing\\Pipelines}
+\label{sec:genomic-processing-pipelines}
+
+After sequencing and alignment, there are a few common steps in modern genomic processing pipelines for producing
+variant call ready reads. These steps minimize the amount of erroneous data in the input read set by eliminating duplicate data,
+verifying the alignment of short inserts/deletions~(indels), and calibrating the quality scores assigned to bases~(base quality score
+recalibration, BQSR). The typical pipeline for variant calling is illustrated in figure~\ref{fig:pipeline}.
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=0.9\linewidth]{pipeline.pdf}
+\end{center}
+\caption{Variant Calling Pipeline}
+\label{fig:pipeline}
+\end{figure}
+
+Traditionally, bioinformaticians have focused on improving the accuracy of the algorithms used for alignment and variant
+calling. There is obvious merit to this approach~---~these two steps are the dominant contributors to the accuracy of the variant
+calling pipeline. However, the intermediate read processing stages are responsible for the majority of execution time. A
+breakdown of stage execution time is shown in table~\ref{tab:stage-time} for the version 2.7 of the Genome Analysis
+Toolkit~(GATK), a popular variant calling pipeline~\cite{mckenna10}. The numbers in the table are derived from running on
+the NA12878 high-coverage human genome.
+
+\begin{table}[h]
+\caption{Processing Stage Times for GATK Pipelines}
+\label{tab:stage-time}
+\begin{center}
+\begin{tabular}{| l | c | c |}
+\hline
+\bf Stage & \bf GATK 2.7/NA12878 \\
+\hline
+Alignment & 6 hr \\
+Sort & \\
+Mark Duplicates & \\
+BQSR & \\
+Realignment & \\
+Call Variants & \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+To provide the readers with a background about how the stages of this pipeline work, we will discuss the algorithms that
+implement the intermediate read processing stages. For a detailed discussion of these algorithms, we refer readers to DePristo
+et al~\cite{depristo11}.
+
+\paragraph{Sorting:}
+\label{sec:sorting}
+
+This phase performs a pass over the reads and sorts them by the reference position at the start of their alignment.
+
+\paragraph{Duplicate Removal:} 
+\label{sec:duplicate-removal}
+
+Due to imperfections during the sequencing process, an unknown number of reads are optically duplicated. If these duplicate
+reads are not removed, they will then incorrectly bias the variant caller, and can lead to incorrect variant calls. In this stage, we
+review all reads mapped at a specific loci, and discard reads that have identical sequence information.
+
+\paragraph{Base Quality Score Recalibration:} 
+\label{sec:bqsr}
+
+During the sequencing process, systemic errors occur that lead to the incorrect assignment of base quality scores. In this step, a
+statistical model of the quality scores is built and is then used to revise the measured quality scores.
+
+\paragraph{Local Realignment:} 
+\label{sec:local-realignment}
+
+For performance reasons, all modern aligners use algorithms that provide approximate alignments. This can cause reads with
+evidence of indels to have slight misalignments with the reference. In this stage, we use fully accurate sequence alignment
+methods~(Smith-Waterman algorithm~\cite{smith81}) to locally realign reads that contain evidence of short indels. This pipeline
+step is omitted in some variant calling pipelines, if the variant calling algorithm that is implemented is not susceptible to these
+local alignment errors.
+
+For current implementations of these read processing steps, performance is limited by disk bandwidth. This is because the operations
+read in a SAM/BAM file, perform a bit of processing, and write the data to disk as a new SAM/BAM file. We address this by performing
+our processing iteratively in memory. The four read processing stages can then be chained together, eliminating three dumps to
+disk and an additional three long reads from disk. 
+
+\section{Data Format and API}
+\label{sec:data-format-and-api}
+
+ADAM contains formats for storing read and reference oriented sequence information, and variant/genotype data.
+The read oriented sequence format is forwards and backwards compatible with BAM/SAM, and the variant/genotype
+data is forwards and backwards compatible with VCF. In this section, we discuss the frameworks used to store this
+data. We then introduce the representations, and discuss the content of each representation.
+
+The data representation for the ADAM format is described using the open source Apache Avro data serialization
+system~\cite{avro}. The Avro system also provides a human readable schema description language that can
+auto-generate the schema implementation in several common languages including Scala, Java, C/C++/C\#,
+Python, Ruby, and php. This provides a significant cross-compatibility advantage over the BAM/SAM format,
+where the data format has only been implemented for C/C++ through Samtools and for Java through
+Picard~\cite{li09,picard}.
+
+We layer this data format inside of the Parquet column store~\cite{parquet}. Parquet is an open source columnar storage
+format that was designed by Twitter, which can be used as a single flat file, a distributed file, or as a database inside of
+Hive, Shark, or Impala. Columnar stores like Parquet provide several significant advantages when storing genomic data:
+
+\begin{itemize}
+\item Column stores enable predicate pushdown~\cite{lamb12}, which minimizes the amount of data read from disk. When
+using predicate pushdown, we deserialize specific fields in a record from disk, and apply them to a predicate function. We
+then only read the full record if it passes the predicate. This is useful when implementing filters that check read quality.
+\item Column stores achieve extremely high compression~\cite{abadi06}. This reduces storage space on disk, and also improves
+serialization performance inside of MapReduce frameworks. We are able to achieve a 0.75$\times$ lossless compression
+ratio when compared to BAM, and have especially impressive results on quality scores. This is discussed in more
+detail in~\S\ref{sec:compression}.
+\item Varied data projections can be achieved with column stores. This means that we can choose to only read several
+fields from a record. This improves performance for applications that do not read all the fields of a record. Additionally,
+we do not pay for null fields in records that we store. This allows us to easily implement lossy compression on top of the
+ADAM format, and also allows us to eliminate the FASTQ standard.
+\end{itemize}
+
+By supporting varied data projections with low cost for field nullification, we can implement lossy compression on top
+of the ADAM format. We discuss this further in~\S\ref{sec:compression}.
+
+\subsection{Read Oriented Storage}
+\label{sec:read-oriented-storage}
+
+Our default read oriented data format is defined in table~\ref{tab:read-oriented-format}. This format provides all of the
+fields supported by the SAM format. To make it easier to split the file between multiple machines for distributed processing,
+we have eliminated the file header. Instead, the data encoded in the file header can be reproduced from every single
+record. Because our columnar store supports dictionary encoding and these fields are replicated across all records,
+replicating this data across all records has a negligible cost in terms of file size on disk.
+
+\begin{table}[h]
+\caption{Read Oriented Format}
+\label{tab:read-oriented-format}
+\begin{center}
+\begin{tabular}{| c | l | c |}
+\hline
+\bf Group & \bf Field & \bf Type \\
+\hline
+General & Reference Name & String \\
+ & Reference ID & Int \\
+ & Start & Long \\
+ & Mapping Quality & Int \\
+ & Read Name & String \\
+ & Sequence & String \\
+ & Mate Reference & String \\
+ & Mate Alignment Start & Long \\
+ & Mate Reference ID & Int \\
+ & Cigar & String \\
+ & Base Quality & String \\
+\hline
+Flags & Read Paired & Boolean \\
+ & Proper Pair & Boolean \\
+ & Read Mapped & Boolean \\
+ & Mate Mapped & Boolean \\
+ & Read Negative Strand & Boolean \\
+ & Mate Negative Strand & Boolean \\
+ & First Of Pair & Boolean \\
+ & Second Of Pair & Boolean \\
+ & Primary Alignment & Boolean \\
+ & Failed Vendor Checks & Boolean \\
+ & Duplicate Read & Boolean \\
+\hline
+Attributes & Mismatching Positions & String \\
+ & Other Attributes & String \\
+\hline
+Read Group & Sequencing Center & String \\
+ & Description & String \\
+ & Run Date & Long \\
+ & Flow Order & String \\
+ & Key Sequence & String \\
+ & Library & String \\
+ & Median Insert & Int \\
+ & Platform & String \\
+ & Platform Unit & String \\
+ & Sample & String \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+This format is used to store all data on disk. In addition to this format, we provide an enhanced API for accessing read
+data.
+
+\subsection{Reference Oriented Storage}
+\label{sec:reference-oriented-storage}
+
+In addition to storing sequences as reads, we provide a storage format for reference oriented (pileup) data. This format
+is documented in table~\ref{tab:reference-oriented-format}. This pileup format is also used to implement a data storage
+format similar to the GATK's ReducedReads format~\cite{depristo11}.
+
+\begin{table}[h]
+\caption{Reference Oriented Format}
+\label{tab:reference-oriented-format}
+\begin{center}
+\begin{tabular}{| c | l | c |}
+\hline
+\bf Group & \bf Field & \bf Type \\
+\hline
+General & Reference Name & String \\
+ & Reference ID & Int \\
+ & Position & Long \\
+ & Range Offset & Int \\
+ & Range Length & Int \\
+ & Reference Base & Base \\
+ & Read Base & Base \\
+ & Base Quality & Int \\
+ & Mapping Quality & Int \\
+ & Number Soft Clipped & Int \\
+ & Number Reverse Strand & Int \\
+ & Count At Position & Int \\
+\hline
+Read Group & Sequencing Center & String \\
+ & Description & String \\
+ & Run Date & Long \\
+ & Flow Order & String \\
+ & Key Sequence & String \\
+ & Library & String \\
+ & Median Insert & Int \\
+ & Platform & String \\
+ & Platform Unit & String \\
+ & Sample & String \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+We treat inserts as an inserted sequence range at the locus position. For bases that are an alignment match against the
+reference\footnote{Following the conventions for CIGAR strings, an alignment match does not necessarily correspond to
+a sequence match. An alignment match simply means that the base is not part of an indel. The base may not match the
+reference base at the loci.}, we store the read base and set the range offset and length to 0. For deletions, we perform the
+same operation for each reference position in the deletion, but set the read base to null. For inserts, we set the range length
+to the length of the insert. We step through the insert from the start of the read to the end of the read, and increment the
+range offset at each position.
+
+As noted earlier, this datatype supports an operation similar to the GATK's ReducedRead datatype. We refer to these datatypes
+as aggregated pileups. We perform aggregation by grouping together all bases that share a common reference position and
+read base. Within an insert, we group further by the position in the insert. Once the bases have been grouped together, we average
+the base and mapping quality scores. We also count the number of soft clipped bases that show up at this location, and the amount
+of bases that are mapped to the reverse strand.
+
+\subsection{Variant and Genotype Storage}
+\label{sec:variant-and-genotype-storage}
+
+\begin{table}[h]
+\caption{Genotype Format}
+\label{tab:genotype-format}
+\begin{center}
+\begin{tabular}{| l | c |}
+\hline
+\bf Field & \bf Type \\
+\hline
+Sample ID & String \\
+Genotype & Array[Int] \\
+Likelihood (Phred) & Array[Int] \\
+Format & String \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{table}[h]
+\caption{Variant Format}
+\label{tab:variant-format}
+\begin{center}
+\begin{tabular}{| l | c |}
+\hline
+\bf Field & \bf Type \\
+\hline
+Reference Name & String \\
+Position & Long \\
+Variant ID & String \\
+Reference Allele & String \\
+Alternate Alleles & Array[String] \\
+Allele Count & Array[Int] \\
+Chromosome Count & Int \\
+Type & Variant Type \\
+Info & String \\
+Filter & String \\
+Genotypes & Array[AdamGenotype] \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+Variant type is one of SNP, multiple nucleotide polymorphism~(MNP), insertion, deletion, structural variant~(SV), or complex.
+
+\section{In-Memory Programming\\Model}
+\label{sec:in-memory-programming-model}
+
+\section{Performance}
+\label{sec:performance}
+
+\subsection{Microbenchmarks}
+\label{sec:microbenchmarks}
+
+\subsection{Applications}
+\label{sec:applications}
+
+\subsection{Compression}
+\label{sec:compression}
+
+\section{Future Work}
+\label{sec:future-work}
+
+Beyond the initial release of the ADAM data formats, API, and read transformations, we are working on several other
+extensions to ADAM. These extensions strive to make ADAM accessible to more users and to more programming patterns.
+
+\subsection{Database Integration}
+\label{sec:database-integration}
+
+\subsection{API Support Across Languages}
+\label{sec:api-support-across-languages}
+
+Currently, the ADAM API and example read processing pipeline are implemented in the Scala language. However, long
+term we plan to make the API accessible to users of other languages. ADAM is built on top of Avro, Parquet, and Spark.
+Spark has bindings for Scala, Java, and Python, and Parquet implementations exist for Java and C++. As the data model
+is implemented on top of Avro, the data model can also be auto\-generated for C/C++/C\#, Python, Ruby, and php. We hope
+to make API implementations available for some of these languages at a later date.
+
+\section{Summary}
+\label{sec:summary}
+
+In this technical report, we have presented ADAM which is a new data storage format and processing pipeline for
+genomics data. ADAM makes use of efficient columnar storage systems to improve the lossless compression available
+for storing read data, and uses in-memory processing techniques to eliminate the read processing bottleneck faced
+by modern variant calling pipelines. On top of the file formats that we have implemented, we also present APIs that enhance
+developer access to read, pileup, genotype, and variant data. We are currently in the process of extending ADAM to
+support SQL querying of genomic data, and extending our API to more programming languages. ADAM promises
+to improve the development of applications that process genomic data, by removing current difficulties with the extraction
+and loading of data and by providing simple and performant programming abstractions for processing this data.
+
+\section{Availability}
+\label{sec:availability}
+
+The ADAM source code is available at Github at \url{http://www.github.com/massie/adam}. Additionally, ADAM is
+deployed through Maven with the following dependency:
+
+\begin{verbatim}
+TBD
+\end{verbatim}
+
+At publication time, the current version of ADAM is 0.5.0. ADAM is open source and is released under the Apache 2
+license.
 
 \bibliographystyle{acm}
 
 \bibliography{adam-tr}
+
+\clearpage
 
 \end{document}
