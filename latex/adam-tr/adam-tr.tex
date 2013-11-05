@@ -62,9 +62,9 @@ processing. These frameworks and formats scale efficiently to modern cloud compu
 speedup read translation steps that are required between alignment and variant calling. In this paper, we provide an
 introduction to the data formats~(\S\ref{sec:current-genomics-storage-standards}) and pipelines used to process
 genomes~(\S\ref{sec:genomic-processing-pipelines}), introduce the ADAM formats and data access
-APIs~(\S\ref{sec:data-format-and-api}) and programing model~(\S\ref{sec:in-memory-programming-model}). Finally,
-we review the performance and compression gains we achieve~(\S\ref{sec:performance}), and outline future enhancements
-to ADAM that we are working on~(\S\ref{sec:future-work}).
+application programming interfaces~(APIs)~(\S\ref{sec:data-format-and-api}) and programing
+model~(\S\ref{sec:in-memory-programming-model}). Finally, we review the performance and compression gains we
+achieve~(\S\ref{sec:performance}), and outline future enhancements to ADAM that we are working on~(\S\ref{sec:future-work}).
 
 \section{Current Genomics Storage Standards}
 \label{sec:current-genomics-storage-standards}
@@ -162,6 +162,47 @@ For current implementations of these read processing steps, performance is limit
 read in a SAM/BAM file, perform a bit of processing, and write the data to disk as a new SAM/BAM file. We address this by performing
 our processing iteratively in memory. The four read processing stages can then be chained together, eliminating three dumps to
 disk and an additional three long reads from disk. 
+
+\section{Design Philosophy}
+\label{sec:design-philosophy}
+
+Modern bioinformatics pipelines have been designed without a model for how the system should grow or for how
+components of the analytical system should connect. We seek to provide a more principled model for system composition.
+Our system architecture was inspired heavily by the Open Systems Interconnection (OSI) model for networking
+services~\cite{zimmermann80}. This conceptual model standardized the internal functionality of a networked
+computer system, and was critical to the development of the services that would become the modern internet. We present
+a similar decomposition of services for genomics data in figure~\ref{fig:stack-model}.
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=0.9\linewidth]{stack-model.pdf}
+\end{center}
+\caption{Stack Models for Networking and Genomics}
+\label{fig:stack-model}
+\end{figure}
+
+The six levels of our stack model are decomposed as follows:
+
+\begin{enumerate}
+\item {\bf Storage:} This layer manages access, replication, and distribution of the genomics files that have been written to disk.
+\item {\bf Data Format:} This layer defines how data is written to disk, and how data is serialized in a distributed computing environment.
+\item {\bf Compute Substrate:} The compute substrate layer provides efficient mechanisms for implementing control flow and
+distributing work.
+\item {\bf Data Access:} This layer provides access to the data stored on disk, and implements efficient methods for performing
+common access patterns such as random database queries, or sequentially reading records from a flat file. 
+\item {\bf API:} The API layer sits on top of the data access layer and provides the application developer with efficient and
+straightforward methods for querying the characteristics of individual portions of genetic data. 
+\item {\bf Application:} Applications like variant calling and alignment are implemented in this layer.
+\end{enumerate}
+
+A well defined software stack has several significant advantages. By limiting application interactions with layers lower than the API,
+application developers are given a clear and consistent view of the data they are processing. By divorcing the API from the data
+access layer, we unlock significant flexibility. With careful design in the data format and data access layers, we can seamlessly
+support conventional flat file access patterns, while also allowing easy access to data with database
+methods~(see~\S\ref{sec:database-integration}). By treating the compute substrate and storage as separate layers, we also
+drastically increase the portability of the APIs that we implement. This approach is a significant improvement over current approaches
+which intertwine all layers together --- if all layers are intertwined, new APIs must be developed to support new compute
+substrates~\cite{niemenmaa12}, and new access patterns must be carefully retrofitted to the data format that is in use~\cite{kozanitis13}.
 
 \section{Data Format and API}
 \label{sec:data-format-and-api}
@@ -367,6 +408,19 @@ Variant type is one of SNP, multiple nucleotide polymorphism~(MNP), insertion, d
 \section{In-Memory Programming\\Model}
 \label{sec:in-memory-programming-model}
 
+As discussed in~\S\ref{sec:genomic-processing-pipelines}, the main bottleneck in current genomics processing pipelines is
+packaging data up on disk in a BAM file after each processing step. While this process is useful as it maintains data
+lineage\footnote{Since we store the intermediate data from each processing step, we can later redo all pipeline processing
+after a certain stage without needing to rerun the earlier stages. This comes at the obvious cost of space on disk. This tradeoff
+makes sense if the cost of keeping data on disk and reloading it later is lower than the cost of recomputing the data. This
+does not necessarily hold for modern MapReduce frameworks~\cite{zaharia12}.}, it significantly increases the latency of the
+processing pipeline.
+
+For the processing pipeline we have built on top of the ADAM format, we have minimized disk accesses~(read one file at the
+start of the pipeline, and write one file after all transformations have been completed). Instead, we cache the reads that we are
+transforming in memory, and chain multiple transformations together. Our pipeline is implemented on top of the Spark MapReduce
+framework, where reads are stored as a map using the Resilient Distributed Dataset~(RDD) primitive.
+
 \section{Performance}
 \label{sec:performance}
 
@@ -397,6 +451,15 @@ Spark has bindings for Scala, Java, and Python, and Parquet implementations exis
 is implemented on top of Avro, the data model can also be auto\-generated for C/C++/C\#, Python, Ruby, and php. We hope
 to make API implementations available for some of these languages at a later date.
 
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Columnar vs. Row Storage}
+\label{sec:columnar-vs-row-storage}
+
+\subsection{Big Data vs. Traditional\\Processing}
+\label{sec:big-data}
+
 \section{Summary}
 \label{sec:summary}
 
@@ -412,8 +475,8 @@ and loading of data and by providing simple and performant programming abstracti
 \section{Availability}
 \label{sec:availability}
 
-The ADAM source code is available at Github at \url{http://www.github.com/massie/adam}. Additionally, ADAM is
-deployed through Maven with the following dependency:
+The ADAM source code is available at Github at \url{http://www.github.com/massie/adam}, and the ADAM project website
+is at \url{http://adam.cs.berkeley.edu}. Additionally, ADAM is deployed through Maven with the following dependency:
 
 \begin{verbatim}
 TBD
