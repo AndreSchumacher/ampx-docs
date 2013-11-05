@@ -457,6 +457,21 @@ to make API implementations available for some of these languages at a later dat
 \subsection{Columnar vs. Row Storage}
 \label{sec:columnar-vs-row-storage}
 
+In our current implementation, we use the Parquet columnar store to implement the data access layer. We chose to use
+columnar storage as we believe that columnar storage is a better fit for bioinformatics workloads than flat row storage;
+this discussion is introduced in~\S\ref{sec:data-format-and-api}. Typically, column based storage is preferable unless
+our workload is write heavy; write heavy workloads perform better with row based storage formats~\cite{stonebraker05}.
+Genomics pipelines tend to skew in favor of reading data~---~pipelines tend to read a large dataset, prune/reduce data,
+perform an analysis, and then write out a significantly smaller file that contains the results of the analysis.
+
+However, it is conceivable that emerging workloads could change to be write heavy. We note that although our current
+implementation would not be optimized for these workloads, the layered model proposed in~\S\ref{sec:design-philosophy}
+allows us to easily change our implementation. Specifically, we can swap out columnar storage in the data access layer with
+row oriented storage~\footnote{It is worth noting that the Avro serialization system that we use to define ADAM is a performant
+row oriented system.}. The rest of the implementation in the system would be isolated from this change: algorithms in the
+pipeline would be implemented on top of the higher level API, and the compute substrate would interact with the data access
+layer to implement the process of reading and writing data. 
+
 \subsection{Big Data vs. Traditional\\Processing}
 \label{sec:big-data}
 
