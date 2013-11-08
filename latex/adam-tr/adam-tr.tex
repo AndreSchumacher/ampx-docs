@@ -87,6 +87,18 @@ similar fields as BAM but with better compression. Lossy compression is achieved
 by binning quality scores to reduce the amount of data that needs to be saved. This format provides its own API, and has some
 compatibility with the existing Picard API for Java~\cite{picard}.
 
+{\bf XXX New version of the paragraph above}
+
+In response to the growing size of sequencing files \footnote{High coverage BAM files can be approximately 250 GB for a human genome.},
+a variety of compression methods have come to light \cite{kozanitis2011, fritz11, WanBioinformatics, Popitsch2012, Asnani2012, CoxBW, 
+recoil, Jones2012, Janin2013}. Slimgene \cite{kozanitis2011}, cSRA \cite{SRA} and CRAM \cite{fritz11} use reference based compression
+techniques to losslessly represent reads while they advocate in favor of lossy quality value representations. The former two use lower
+quantization levels to represent quality values and CRAM uses user defined budgets to store only fractions of a quality string. 
+In the same spirit, Illumina presented recently
+a systematic approach of quality score removal in \cite{Janin2013} which safely ignores quality scores from predictable nucleotides; these
+are bases that always appear after certain words. It is also worth mentioning that the standard configurations of cSRA and CRAM discard
+the optional fields of the BAM format and also simplify the QNAME field. 
+
 \section{Genomic Processing\\Pipelines}
 \label{sec:genomic-processing-pipelines}
 
@@ -486,7 +498,20 @@ extensions to ADAM. These extensions strive to make ADAM accessible to more user
 \subsection{Database Integration}
 \label{sec:database-integration}
 
-Christos
+ADAM format plays a central role in a library that we develop which will allow sequencing data to be queried from 
+the popular SQL based warehouse software such as SHARK \cite{shark}, Hive \cite{hive} and Impala \cite{impala}. In fact,
+the Avro/Parquet storage backend enables the direct usage of ADAM files as SQL tables; this integration is facilitated through libraries 
+that integrate Parquet with the afore mentioned software \cite{parquet}.
+
+Of course there is a lot of work remaining before SHARK provides biologically relevant functionality,
+such as the one that is outlined in \cite{bafna2013}; SHARK needs to get enhanced with libraries that provide
+efficient indexing, storage management
+and interval query handling. The indexing scheme that we develop enables range based read retrieval, such as the
+indexing mechanism of samtools, quick access to mate pair reads such as the indexing mechanism of GQL \cite{kozanitis13} and
+also text based search features on fields such as the read sequence and the CIGAR string. To keep storage
+under control we implement a set of heuristics that prevent the materialization of queries with reproducible output. 
+Finally, given that most biological data is modelled after intervals on the human genome, our library includes
+user defined functions that implement interval operators such as the IntervalJoin operator of GQL.
 
 \subsection{API Support Across Languages}
 \label{sec:api-support-across-languages}
