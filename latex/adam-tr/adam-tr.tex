@@ -130,12 +130,12 @@ the NA12878 high-coverage human genome.
 \hline
 \bf Stage & \bf GATK 2.7/NA12878 \\
 \hline
-Alignment & 6 hr \\
+Alignment & 52 hr \\
 Sort & \\
 Mark Duplicates & 13 hr \\
 BQSR & 6 hr \\
 Realignment & 33 hr \\
-Call Variants & \\
+Call Variants & 4 hr \\
 \bf Total & \bf 67 hr \\
 \hline
 \end{tabular}
@@ -208,8 +208,8 @@ distributing work.
 data is serialized in a distributed computing environment
 \item {\bf Evidence Access:} This layer implements efficient methods for performing common access patterns such as random database
 queries, or sequentially reading records from a flat file. 
-\item {\bf API:} The API layer sits on top of the data access layer and provides the application developer with efficient and
-straightforward methods for querying the characteristics of individual portions of genetic data. 
+\item {\bf Presentation:} The presentation layer sits on top of the data access layer and provides the application developer with efficient and
+straightforward methods for querying the characteristics of individual portions of genetic data.
 \item {\bf Application:} Applications like variant calling and alignment are implemented in this layer.
 \end{enumerate}
 
@@ -550,12 +550,12 @@ layer to implement the process of reading and writing data.
 
 Matt
 
-\subsection{New Applications Enabled By ADAM}
+\subsection{New Applications Enabled\\By ADAM}
 \label{sec:new-applications}
 
 Chris H (fallback to Frank?)
 
-\subsection{Programming Model Improvements}
+\subsection{Programming Model\\Improvements}
 \label{sec:programming-model-improvements}
 
 Beyond improving performance by processing data in memory, our programming model improves programmer efficiency.
@@ -570,10 +570,40 @@ section~\S\ref{sec:design-philosophy}. To reduce the cost of this API, we make a
 internal schema to the data types presented in our API lazy. This eliminates the cost of providing these functions if they are
 not used. Additionally, if an additional transformation is required, we only pay the cost the first time the transformation is performed.
 
-In total, these improvements can provide a $4\times$ improvement in programmer productivity. This is demonstrated through
+In total, these improvements can provide a $2\times$ improvement in programmer productivity. This is demonstrated through
 GAParquet, which demonstrates some of the functionality in the GATK on top of the ADAM stack~\cite{gaparquet}. In the
 DiagnoseTargets stage of GATK, the number of lines of code~(LOC) needed to implement the stage dropped from 400 to
-150. We expect these gains to be fairly universal\footnote{TODO: Compare Picard and ADAM transforms.}.
+200. We also see a reduction in lines of code needed to implement the read transformation pipeline described
+in~\S\ref{sec:genomic-processing-pipelines}. A LOC comparison of GATK/GAParquet and the read transformation pipeline
+is found in table~\ref{tab:lines-of-code}.
+
+\begin{table}[h]
+\caption{Lines of Code for ADAM and Original Implementation}
+\label{tab:lines-of-code}
+\begin{center}
+\begin{tabular}{| l | c | c |}
+\hline
+\bf Application & \bf Original & \bf ADAM \\
+\hline
+\hline
+\multicolumn{3}{| l |}{\bf GATK Diagnose Targets} \\
+\hline
+Walker & 326 & 134 \\
+Subclass & 93 & 66 \\
+\bf Total & \bf 419 & \bf 200 \\
+\hline
+\hline
+\multicolumn{3}{| l |}{\bf Translation Pipeline} \\
+\hline
+BQSR & & \\
+Mark Duplicates & & \\
+Realign Indels & & \\
+Sort & & \\
+\bf Total & & \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
 
 \subsection{Benefits of Explicit Schema}
 \label{sec:benefits-of-explicit-schema}
