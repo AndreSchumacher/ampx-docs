@@ -83,7 +83,7 @@ environments of less than 8 machines.
 
 In response to the growing size of sequencing files\footnote{High coverage BAM files can be approximately 250 GB for a human genome.},
 a variety of compression methods have come to light~\cite{kozanitis2011, fritz11, WanBioinformatics, Popitsch2012, Asnani2012, CoxBW, 
-recoil, Jones2012, Janin2013}. Slimgene~\cite{kozanitis2011}, cSRA~\cite{SRA}, and CRAM~\cite{fritz11} use reference based compression
+recoil, Jones2012, Janin2013}. SlimGene~\cite{kozanitis2011}, cSRA~\cite{SRA}, and CRAM~\cite{fritz11} use reference based compression
 techniques to losslessly represent reads while they advocate in favor of lossy quality value representations. The former two use lower
 quantization levels to represent quality values and CRAM uses user defined budgets to store only fractions of a quality string. 
 In the same spirit, Illumina presented recently a systematic approach of quality score removal in~\cite{Janin2013} which safely ignores
@@ -212,10 +212,21 @@ drastically increase the portability of the APIs that we implement. This approac
 which intertwine all layers together --- if all layers are intertwined, new APIs must be developed to support new compute
 substrates~\cite{niemenmaa12}, and new access patterns must be carefully retrofitted to the data format that is in use~\cite{kozanitis13}.
 
-We can distill our philosophy into a simple set of goals that drives our design decisions:
+We can distill our philosophy into three observations that drive our design decisions:
 
 \begin{enumerate}
-\item TBA.
+\item {\bf Scalability is a primary concern for modern genomics systems:} Processing pipelines operate on data that can range in size from
+tens of gigabytes to petabytes. We cannot remove processing stages, as this has an unacceptable impact on accuracy. To increase
+pipeline latency and throughput, our systems must be able to scale efficiently to tens to hundreds of nodes.
+\item {\bf Bioinformaticans should be concerned with data, not formats:} The SAM/BAM formats do not provide a schema for the data they
+store. This limits visibility into the structure of data being processed. Additionally, it significantly increases implementation difficulty: by
+making the format a primary concern, significant work has been required to introduce programming interfaces that allow these formats to
+be read from different programming languages and environments~\cite{li09,picard,niemenmaa12}.
+\item {\bf Openness and flexibility are critical to adoption:} As the cost of sequencing continues to drop~\cite{nhgri}, the processing of genomics
+data will become more widespread. By maintaining an open source standard that can be flexibly modified, we allow all the members of the
+community to contribute to improving our technologies. Developing a flexible stack is also important; genetic data will be processed in a host
+of heterogenous computing environments, and with a variety of access patterns. By making our format easy to adopt to different techniques, we
+maximize its use.
 \end{enumerate}
 
 In the next few sections, we discuss the implementation of ADAM, and how it was designed to satisfy these goals. We then
@@ -463,6 +474,20 @@ framework, where reads are stored as a map using the Resilient Distributed Datas
 \section{Performance}
 \label{sec:performance}
 
+This section reviews performance metrics pertinent to the ADAM file format, and applications written on top of ADAM. Our performance
+analysis is partitioned into three sections:
+
+\begin{itemize}
+\item {\bf \ref{sec:microbenchmarks}. Microbenchmarks:} In this section, we review several testcases that have little computation, and
+review ADAM against Hadoop-BAM. This section looks to evaluate the disk access performance of ADAM. In this section, we are most
+interested in validating scalability and building intuition for the efficiencies provided by variable projection and predicate pushdown.
+\item {\bf \ref{sec:applications}. Applications:} The main goal of ADAM is to accelerate the read processing pipelines that were introduced
+in~\S\ref{sec:genomic-processing-pipelines}. In this section, we review the throughput of our processing pipeline.
+\item {\bf \ref{sec:compression}. Compression:} Here, we review the reductions in disk space that we are able to achieve when compared
+against BAM. We also review how we can achieve further compression through aggregating pileup data, and how to implement both
+lossy and reference-based compression top of ADAM.
+\end{itemize}
+
 \subsection{Microbenchmarks}
 \label{sec:microbenchmarks}
 
@@ -473,7 +498,17 @@ cluster. We used the $m2.4xlarge$ instance type for all of our tests. This insta
 with 68.4 Gibibytes (GiB) of memory per machine. We ran these benchmarks against two genomes from the 1000 Genomes project:
 HG00096, a low-coverage human genome (15 GB BAM), and NA12878, a high-coverage human genome (246 GB BAM).
 
-\subsubsection{Read Length and Quality:} 
+\subsubsection{Read/Write Performance}
+\label{sec:read-write-performance}
+
+The decision to use a columnar store was based off of the observation that most genomics applications are read-heavy. In this section,
+we aim to quantify the improvements in read performance that we achieve by using a column store, and how far these gains can be
+maximized through the use of projections. We also seek to observe how significant of a penalty we pay when writing data back to disk.
+
+\paragraph{Data Materialization and Write Performance:}
+\label{sec:data-materialization}
+
+\paragraph{Read Length and Quality:}
 \label{sec:read-length-and-quality}
 
 This microbenchmark scans all the reads in the file, and collects statistics about the length of the read, and the mapping quality score.
@@ -482,19 +517,86 @@ The results of this benchmark can be found in Figure~\ref{fig:length-quality}.
 \begin{figure}[h]
 \begin{center}
 \includegraphics[width=\linewidth]{microbenchmarks/length_and_quality_low_coverage.pdf}
+\includegraphics[width=\linewidth]{microbenchmarks/length_and_quality_low_coverage.pdf}
 \end{center}
+\caption{Read Length and Quality Speedup for HG00096 and NA12878}
 \label{fig:length-quality}
 \end{figure}
+
+\subsubsection{Predicate Pushdown}
+\label{sec:predicate-pushdown}
+
+Predicate pushdown is one of the significant advantages afforded to us through the use of Parquet	~\cite{parquet}. In traditional
+pipelines, the full record is deserialized from disk, and the filter is implemented as a Map/Reduce processing stage. Parquet provides
+us with predicate pushdown: we deserialize only the columns needed to identify whether the record should be fully deserialized. We
+then process those fields; if they pass the predicate, we then deserialize the full record.
+
+We can prove that this process requires no additional reads: intuitively, the initial columns read would need to be read if they were to be
+used in the filter later. Formally, if $R$ is the set of records to read, $Proj$ is the projection we are using, and $size(i,j)$ returns the amount
+of data recorded in column $j$ of record $i$, the total data read without predicate pushdown is:
+
+\begin{equation}
+\label{eqn:no-predicate}
+\sum_{m}^{R}{\sum_{i}^{Proj}size(m,i)}
+\end{equation}
+
+By using predicate pushdown, we reduce this total to:
+
+\begin{equation}
+\label{eqn:predicate}
+\sum_{m}^{R}{\sum_{i}^{Pred}size(m,i)} + \sum_{n}^{R_{p=True}}{\sum_{i}^{Proj \setminus Pred}size(n,i)}
+\end{equation}
+
+$Pred$ represents the set of columns used in the predicate. The set $R_{p=True}$ represents the subset of records in $R$ that pass
+the predicate function. We can show that  if no records fail the predicate~(i.e.~$R~=~R_{p=True}$), then equations \ref{eqn:no-predicate}
+and \ref{eqn:predicate} become equal. This is because by definition $Proj~=~(Pred~\cup~(Proj~\setminus~Pred))$.
+
+In this section, we seek to provide an intuition for how predicate pushdown can improve the performance of actual genomics workloads.
+We apply predicate pushdown to implement read quality predication, mapping score predication, and predication by chromosome. 
+
+\paragraph{Quality Flags Predicate:}
+\label{sec:quality-flags-predicate}
+
+This microbenchmark scans the reads in a file, and filters out reads that do not meet a specified quality threshold. We use the following
+quality threshold:
+
+\begin{itemize}
+\item The read is mapped.
+\item The read is at its primary alignment position.
+\item The read did not fail vendor quality checks.
+\item The read has not been marked as a duplicate.
+\end{itemize}
+
+This threshold is typically applied as one of the first operations in any read processing pipeline. 
 
 \subsection{Applications}
 \label{sec:applications}
 
-Matt (Sort/MarkDup) and Chris H (BQSR)
+\subsubsection{Sort}
+\label{sec:sort}
+
+Matt
+
+\subsubsection{Base Quality Score Recalibration}
+\label{sec:bqsr}
+
+Chris
+
+\subsubsection{Indel Realignment}
+\label{sec:indel-realignment}
+
+Frank
+
+\subsubsection{Mark Duplicates}
+\label{sec:mark-duplicates}
+
+Matt
 
 \subsection{Compression}
 \label{sec:compression}
 
-Frank
+By using dictionary coding, run length encoding with bit-packing, and GZIP compression, ADAM files can be stored using less
+disk space than an equivalent BAM file. 
 
 \section{Future Work}
 \label{sec:future-work}
@@ -559,7 +661,61 @@ Matt
 \subsection{New Applications Enabled\\By ADAM}
 \label{sec:new-applications}
 
-Chris H (fallback to Frank?)
+The ADAM format and environment provides a significant performance improvement over current BAM based solutions. By reducing
+processing latency, ADAM will make genomic data available for use in latency-critical applications, such as genomic driven treatment
+of acute diseases. Additionally, the genomics stack design we proposed in~\S\ref{sec:design-philosophy} unlocks new computational
+patterns that can be applied to genomic data. In this section, we introduce a few of these novel applications, discuss why they are important,
+and explain how these applications are enabled by ADAM.
+
+\subsubsection{Personalized Treatment of\\Acute Diseases}
+\label{sec:personalized-acute-diseases}
+
+There is significant interest in using genomic data as another layer of evidence for the treatment of diseases that have genetic
+causes~\cite{ghosh09, van13}. While chronic hereditary diseases like Huntington's Disease may not be sensitive to the latency of genomic
+processing pipelines, reduced latency is critical for neonatal diagnosis and for the treatment of some cancers. In acute myeloid
+leukemia~(AML), there exists a well defined set of mutations that can be used for guiding patient treatment~\cite{smith12}. However,
+due to the rapid progression of AML, treatment decisions must be made in under one week. As illustrated
+in~\S\ref{sec:genomic-processing-pipelines}, this target is not within the reach of current processing pipelines.
+
+It is worth noting that the numbers presented in~\S\ref{sec:genomic-processing-pipelines} would be optimistic in reality. To improve
+accuracy, the current state of the art in mutation calling uses very high coverage sequencing data~($\sim100-150\times$) for the
+tumor cell line, along with high coverage sequencing data~($\sim30\times$) for the normal cell line~\cite{cibulskis13}. We are
+developing a variant and mutation calling pipeline that uses the ADAM processing pipeline and the high-performance SNAP
+aligner~\cite{zaharia11} to achieve performance that will satisfy the latency requirements for use in acute disease diagnosis.
+
+\subsubsection{Viral Outbreak Monitoring}
+\label{sec:viral-outbreak-monitoring}
+
+There is significant interest in tools for the analysis of viral outbreaks in both the medical and defense epidemiology
+communities~\cite{snitkin12,beard08}. Genomic techniques can be used for identifying infection vectors in epidemics that
+feature rapidly mutating diseases, as well as for the rapid identification of unknown infectious agents in an attack using
+biological weapons. Similar to the acute genetic driven diseases discussed in \S\ref{sec:personalized-acute-diseases}, both
+of these applications are latency sensitive; the United States Department of Defense (DoD) has set a goal of developing a
+system which can identify an unknown infectious agent within one hour with the use of genomic data.
+
+In addition to providing significantly lower latency than current pipelines, there are other advantages to ADAM. Current
+approaches to tracking viral outbreaks perform a graph based analysis that uses variant data and temporal data to identify
+possible modes of disease transmission~\cite{snitkin12}. As ADAM is implemented on top of Spark, data in ADAM format
+can be processed as a graph by using the GraphX distributed graph analysis framework~\cite{xin13}.
+
+\subsubsection{Ad Hoc Genomic Analysis}
+\label{sec:ad-hoc-genomic-analysis}
+
+ADAM is implemented on top of the Spark MapReduce framework. A major contribution of the Spark framework was the introduction
+of a command line interface that allows for the real-time ad hoc analysis of data kept in memory~\cite{zaharia12}. This interactive
+framework can be coupled with the ability to perform interactive queries in Shark to allow for rapid data aggregation and analysis.
+Several applications for this approach are presented by Kozanitis et al.~\cite{kozanitis13} such as allowing direct evidence access
+to physicians who are working in a clinical setting with patients with hereditary diseases. However, GQL performance limited the
+performance of these queries to $\sim45$ minutes. We are still working on the implementation of our database
+interface~(see~\S\ref{sec:database-integration}), but expect to achieve improved performance.
+
+In addition to clinical applications, interactive data access could be applied to pathway analysis. Specifically, if a biologist has
+genetic data for organisms who demonstrate a specific phenotype, interactive data processing could be used for correlating
+lab observations with genotypes. Instead of genotyping the full genome/exome of all reference organisms, the raw reads for
+all organisms could be aligned in stored in a database. Once lab measurements and cytological observations have allowed
+the biologist to hypothesize that a specific pathway had failed, the database of raw reads could be queried for all genes of
+interest~(genes that influence the pathway under study). This would lead to a significant reduction in the amount of genomic
+data that needed to be processed, which would allow for interactive read processing and variant calling.
 
 \subsection{Programming Model\\Improvements}
 \label{sec:programming-model-improvements}
