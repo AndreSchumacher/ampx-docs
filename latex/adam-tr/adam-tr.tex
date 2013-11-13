@@ -12,6 +12,9 @@
 \usepackage{graphicx}
 \usepackage{authblk}
 \usepackage{hyperref}
+\usepackage{amsthm}
+
+\theoremstyle{plain}
 
 \widowpenalty=500
 \clubpenalty=500
@@ -188,6 +191,8 @@ figure~\ref{fig:stack-model}.
 \label{fig:stack-model}
 \end{figure}
 
+REVIEW STACK
+
 The seven levels of our stack model are decomposed as follows:
 
 \begin{enumerate}
@@ -219,6 +224,9 @@ We can distill our philosophy into three observations that drive our design deci
 tens of gigabytes to petabytes. We cannot remove processing stages, as this has an unacceptable impact on accuracy. To increase
 pipeline latency and throughput, our systems must be able to scale efficiently to tens to hundreds of nodes.
 \item {\bf Bioinformaticans should be concerned with data, not formats:} The SAM/BAM formats do not provide a schema for the data they
+
+REFACTOR THIS
+
 store. This limits visibility into the structure of data being processed. Additionally, it significantly increases implementation difficulty: by
 making the format a primary concern, significant work has been required to introduce programming interfaces that allow these formats to
 be read from different programming languages and environments~\cite{li09,picard,niemenmaa12}.
@@ -531,8 +539,18 @@ pipelines, the full record is deserialized from disk, and the filter is implemen
 us with predicate pushdown: we deserialize only the columns needed to identify whether the record should be fully deserialized. We
 then process those fields; if they pass the predicate, we then deserialize the full record.
 
-We can prove that this process requires no additional reads: intuitively, the initial columns read would need to be read if they were to be
-used in the filter later. Formally, if $R$ is the set of records to read, $Proj$ is the projection we are using, and $size(i,j)$ returns the amount
+We can prove that this process requires no additional reads. Intuitively this is true as the initial columns read would need to be read
+if they were to be used in the filter later. However, this can be formalized.
+
+\newtheorem{predicate-read-conserving}{Theorem}
+
+\begin{predicate-read-conserving}
+Predicate pushdown requires no additional disk accesses.
+\end{predicate-read-conserving}
+
+\begin{proof}
+
+If $R$ is the set of records to read, $Proj$ is the projection we are using, and $size(i,j)$ returns the amount
 of data recorded in column $j$ of record $i$, the total data read without predicate pushdown is:
 
 \begin{equation}
@@ -550,6 +568,8 @@ By using predicate pushdown, we reduce this total to:
 $Pred$ represents the set of columns used in the predicate. The set $R_{p=True}$ represents the subset of records in $R$ that pass
 the predicate function. We can show that  if no records fail the predicate~(i.e.~$R~=~R_{p=True}$), then equations \ref{eqn:no-predicate}
 and \ref{eqn:predicate} become equal. This is because by definition $Proj~=~(Pred~\cup~(Proj~\setminus~Pred))$.
+
+\end{proof}
 
 In this section, we seek to provide an intuition for how predicate pushdown can improve the performance of actual genomics workloads.
 We apply predicate pushdown to implement read quality predication, mapping score predication, and predication by chromosome. 
@@ -578,7 +598,7 @@ This threshold is typically applied as one of the first operations in any read p
 Matt
 
 \subsubsection{Base Quality Score Recalibration}
-\label{sec:bqsr}
+\label{sec:bqsr-perf}
 
 Chris
 
@@ -651,7 +671,9 @@ allows us to easily change our implementation. Specifically, we can swap out col
 row oriented storage~\footnote{It is worth noting that the Avro serialization system that we use to define ADAM is a performant
 row oriented system.}. The rest of the implementation in the system would be isolated from this change: algorithms in the
 pipeline would be implemented on top of the higher level API, and the compute substrate would interact with the data access
-layer to implement the process of reading and writing data. 
+layer to implement the process of reading and writing data.
+
+Impact on number of seeks.
 
 \subsection{Dancehall vs. Datacenter}
 \label{sec:dancehall-vs-datacenter}
@@ -784,6 +806,8 @@ support SQL querying of genomic data, and extending our API to more programming 
 to improve the development of applications that process genomic data, by removing current difficulties with the extraction
 and loading of data and by providing simple and performant programming abstractions for processing this data.
 
+\appendix
+
 \section{Availability}
 \label{sec:availability}
 
@@ -796,6 +820,21 @@ TBD
 
 At publication time, the current version of ADAM is 0.5.0. ADAM is open source and is released under the Apache 2
 license.
+
+\section{Algorithm Implementations}
+\label{sec:algorithm-implentations}
+
+\subsection{Sort Implementation}
+\label{sec:sort-implementation}
+
+\subsection{BQSR Implementation}
+\label{sec:bqsr-implementation}
+
+\subsection{Indel Realignment Implementation}
+\label{sec:indel-realignment-implementation}
+
+\subsection{Duplicate Marking Implementation}
+\label{sec:duplicate-marking-implementation}
 
 \bibliographystyle{acm}
 
