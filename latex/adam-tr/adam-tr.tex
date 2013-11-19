@@ -148,9 +148,12 @@ This phase performs a pass over the reads and sorts them by the reference positi
 \paragraph{Duplicate Removal:} 
 \label{sec:duplicate-removal}
 
-Due to imperfections during the sequencing process, an unknown number of reads are optically duplicated. If these duplicate
-reads are not removed, they will then incorrectly bias the variant caller, and can lead to incorrect variant calls. In this stage, we
-review all reads mapped at a specific loci, and discard reads that have identical sequence information.
+An insufficient number of sample molecules immediately prior to PCR can cause the generation of duplicate DNA sequencing reads.
+Detection of duplicate reads requires matching all reads by their 5$'$ position and orientation after read alignment. Reads with
+identical position and orientation are assumed to be duplicates. When a group of duplicate reads is found, each read is scored
+and all, but the top-scoring read, are marked as duplicates. Approximately 66\% of duplicates marked in this way are true
+duplicates caused by PCR-induced duplication while the remaining 33\% are caused by the random distribution of read ends\cite{20565776}.
+There is currently no way to seperate "true" duplicates from randomly occuring duplicates.
 
 \paragraph{Base Quality Score Recalibration:} 
 \label{sec:bqsr}
@@ -611,6 +614,7 @@ Frank
 \label{sec:mark-duplicates}
 
 Matt
+
 
 \subsection{Compression}
 \label{sec:compression}
