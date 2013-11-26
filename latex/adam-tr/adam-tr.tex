@@ -13,6 +13,16 @@
 \usepackage{authblk}
 \usepackage{hyperref}
 \usepackage{amsthm}
+\usepackage{listings}
+% "define" Scala
+\lstdefinelanguage{scala}{morekeywords={class,object,trait,extends,with,new,if,while,for,def,val,var,this},
+otherkeywords={->,=>},
+sensitive=true,
+morecomment=[l]{//},
+morecomment=[s]{/*}{*/},
+morestring=[b]"}
+% Default settings for code listings
+\lstset{frame=tb,language=scala,aboveskip=3mm,belowskip=3mm,showstringspaces=false,columns=flexible,basicstyle={\small\ttfamily}}
 
 \theoremstyle{plain}
 
@@ -504,18 +514,15 @@ To validate the performance of ADAM, we created several microbenchmarks. These m
 the pure read/write throughput of ADAM, and to show how the system scales in a cluster. To validate these benchmarks, we implemented
 the relevant tests in both ADAM and Hadoop-BAM~\cite{niemenmaa12}, running on Spark on an Amazon Elastic Compute 2 (EC2)
 cluster. We used the $m2.4xlarge$ instance type for all of our tests. This instance type is an 8 core memory optimized machine
-with 68.4 Gibibytes (GiB) of memory per machine. We ran these benchmarks against two genomes from the 1000 Genomes project:
-HG00096, a low-coverage human genome (15 GB BAM), and NA12878, a high-coverage human genome (246 GB BAM).
+with 68.4 Gibibytes (GiB) of memory per machine. We ran these benchmarks against HG00096, a low-coverage human genome (15 GB
+BAM) from the 1,000 Genomes Project.
 
 \subsubsection{Read/Write Performance}
 \label{sec:read-write-performance}
 
 The decision to use a columnar store was based off of the observation that most genomics applications are read-heavy. In this section,
 we aim to quantify the improvements in read performance that we achieve by using a column store, and how far these gains can be
-maximized through the use of projections. We also seek to observe how significant of a penalty we pay when writing data back to disk.
-
-\paragraph{Data Materialization and Write Performance:}
-\label{sec:data-materialization}
+maximized through the use of projections.
 
 \paragraph{Read Length and Quality:}
 \label{sec:read-length-and-quality}
@@ -526,9 +533,8 @@ The results of this benchmark can be found in Figure~\ref{fig:length-quality}.
 \begin{figure}[h]
 \begin{center}
 \includegraphics[width=\linewidth]{microbenchmarks/length_and_quality_low_coverage.pdf}
-\includegraphics[width=\linewidth]{microbenchmarks/length_and_quality_low_coverage.pdf}
 \end{center}
-\caption{Read Length and Quality Speedup for HG00096 and NA12878}
+\caption{Read Length and Quality Speedup for HG00096}
 \label{fig:length-quality}
 \end{figure}
 
@@ -853,9 +859,6 @@ ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 50m45s \\
 \end{scriptsize}
 \end{table}
 
-
-
-
 \subsection{Tuning Spark on EC2}
 
 All applications were run on Amazon EC2 with minimal tuning. The performance numbers in this report
@@ -957,13 +960,6 @@ row oriented system.}. The rest of the implementation in the system would be iso
 pipeline would be implemented on top of the higher level API, and the compute substrate would interact with the data access
 layer to implement the process of reading and writing data.
 
-Impact on number of seeks.
-
-\subsection{Dancehall vs. Datacenter}
-\label{sec:dancehall-vs-datacenter}
-
-Matt
-
 \subsection{New Applications Enabled\\By ADAM}
 \label{sec:new-applications}
 
@@ -1060,23 +1056,18 @@ Walker & 326 & 134 \\
 Subclass & 93 & 66 \\
 \bf Total & \bf 419 & \bf 200 \\
 \hline
-\hline
-\multicolumn{3}{| l |}{\bf Translation Pipeline} \\
-\hline
-BQSR & & \\
-Mark Duplicates & & \\
-Realign Indels & & \\
-Sort & & \\
-\bf Total & & \\
-\hline
+%\hline
+%\multicolumn{3}{| l |}{\bf Translation Pipeline} \\
+%\hline
+%BQSR & & \\
+%Mark Duplicates & & \\
+%Realign Indels & & \\
+%Sort & & \\
+%\bf Total & & \\
+%\hline
 \end{tabular}
 \end{center}
 \end{table}
-
-\subsection{Benefits of Explicit Schema}
-\label{sec:benefits-of-explicit-schema}
-
-Matt
 
 \section{Summary}
 \label{sec:summary}
@@ -1095,7 +1086,7 @@ and loading of data and by providing simple and performant programming abstracti
 \section{Availability}
 \label{sec:availability}
 
-The ADAM source code is available at Github at \url{http://www.github.com/massie/adam}, and the ADAM project website
+The ADAM source code is available at Github at \url{http://www.github.com/bigdatagenomics/adam}, and the ADAM project website
 is at \url{http://adam.cs.berkeley.edu}. Additionally, ADAM is deployed through Maven with the following dependency:
 
 \begin{verbatim}
@@ -1114,10 +1105,220 @@ license.
 \subsection{BQSR Implementation}
 \label{sec:bqsr-implementation}
 
-\subsection{Indel Realignment Implementation}
+Base Quality Score Recalibration is an important early data-normalization step in the bioinformatics pipeline, and after alignment
+it is the next most costliest step. Since quality score recalibration can vastly improve the accuracy of variant calls~---~particularly for
+pileup-based callers like the UnifiedGenotyper or Samtools mpileup. Because of this, it is likely to remain a part of bioinformatics pipelines.
+
+BQSR is also an interesting algorithm in that it doesn't neatly fit into the framework of map reduce (the design philosophy of the GATK).
+Instead it is an embarrassingly parallelizable aggregate. The ADAM implementation is:
+
+\begin{lstlisting}
+def computeTable(rdd: Records, dbsnp: Mask) :
+  RecalTable = {
+  
+  rdd.aggregate(new RecalTable)(    (table, read) => { table + read },    (table, table) => { table ++ table })}
+\end{lstlisting}
+
+The ADAM implementation of BQSR utilizes the MD field to identify bases in the read that mismatch the reference. This enables
+base quality score recalibration to be entirely reference-free, avoiding the need to have a central Fasta store for the human
+reference. However, dbSNP is still needed to mask out positions that are polymorphic (otherwise errors due to real variation will
+severely bias the error rate estimates).
+
+\subsection{Indel Realignment\\Implementation}
 \label{sec:indel-realignment-implementation}
 
-\subsection{Duplicate Marking Implementation}
+Indel realignment is implemented as a two step process. In the first step, we identify regions that have evidence of an insertion or
+deletion. After these regions are identified, we generate candidate haplotypes, and realign reads to minimize the overall quantity
+of mismatches in the region. The quality of mismatches near an indel serves as a good proxy for the local quality of an alignment.
+This is due to the nature of indel alignment errors: when an indel is misaligned, this causes a temporary shift in the read sequence
+against the reference sequence. This shift manifests as a run of several bases with mismatches due to their incorrect alignment.
+
+\subsubsection{Realignment Target Identification}
+\label{sec:realignment-target-identification}
+
+Realignment target identification is done by converting our reads into reference oriented ``rods''\footnote{Also known as pileups: a
+group of bases that are all aligned to a specific locus on the reference.}. At each locus where there is evidence of an insertion or a
+deletion, we create a \emph{target} marker. We also create a target if there is evidence of a mismatch. These targets contain the indel
+range or mismatch positions on the reference, and the range on the reference covered by reads that overlap these sites.
+
+After an initial set of targets are placed, we merge targets together. This is necessary, as during the read realignment process, all
+reads can only be realigned once. This necessitates that all reads are members of either one or zero realignment targets. Practically,
+this means that over the set of all realignment targets, no two targets overlap.
+
+The core of our target identification algorithm can be found below.
+
+\begin{lstlisting}
+def findTargets (reads: RDD[ADAMRecord]):
+    TreeSet[IndelRealignmentTarget] = {
+
+  // convert reads to rods
+  val processor = new Read2PileupProcessor
+  val rods: RDD[Seq[ADAMPileup]] = reads.flatMap(
+      processor.readToPileups(_))
+    .groupBy(_.getPosition).map(_._2)
+
+  // map and merge targets
+  val targetSet = rods.map(
+      IndelRealignmentTarget(_))
+    .filter(!_.isEmpty)
+    .keyBy(_.getReadRange.start)
+    .sortByKey()
+    .map(new TreeSet()(TargetOrdering) + _._2)
+    .fold(new TreeSet()(TargetOrdering))(
+      joinTargets)
+
+  targetSet
+}
+\end{lstlisting}
+
+To generate the initial unmerged set of targets, we rely on the ADAM toolkit's pileup generation utilities~(see~\-S\ref{sec:reference-oriented-storage}).
+We generate realignment targets for all pileups, even if they do not have indel or mismatch evidence. We eliminate pileups that do not contain indels
+or mismatches with a filtering stage that eliminates empty targets. To merge overlapping targets, we map all of the targets into a sorted set. This set
+is implemented using Red-Black trees. This allows for efficient merges, which are implemented with the tail-call recursive \emph{joinTargets} function:
+
+\begin{lstlisting}
+@tailrec def joinTargets (                                                                                                                                                               
+  first: TreeSet[IndelRealignmentTarget],                                                                                                                                                                
+  second: TreeSet[IndelRealignmentTarget]):
+    TreeSet[IndelRealignmentTarget] = {
+
+  if (!TargetOrdering.overlap(first.last,
+      second.head)) {
+    first.union(second)
+  } else {
+    joinTargets (first - first.last +
+      first.last.merge(second.head),
+      second - second.head)
+  }
+}
+\end{lstlisting}
+
+As we are performing a fold on an RDD which is sorted by the starting position of the target on the reference sequence, we know a priori that the elements
+in the ``first'' set will always be ordered earlier relative to the elements in the ``second'' set. However, there can still be overlap between the two sets, as this
+ordering does not account for the end positions of the targets. If there is overlap between the last target in the ``first'' set and the first target in the ``second''
+set, we merge these two elements, and try to merge the two sets again.
+
+\subsubsection{Candidate Generation\\and Realignment}
+\label{sec:candidate-generation-realignment}
+
+Candidate generation is a several step process:
+
+\begin{enumerate}
+\item Realignment targets must ``collect'' the reads that they contain.
+\item For each realignment group, we must generate a new set of candidate haplotype alignments.
+\item Then, these candidate alignments must be tested and compared to the current reference haplotype.
+\item If a candidate haplotype is sufficiently better than the reference, reads are realigned.
+\end{enumerate}
+
+The mapping of reads to realignment targets is done through a tail recursive function that performs a binary search across the sorted set of indel alignment targets:
+
+\begin{lstlisting}
+@tailrec def mapToTarget (read: ADAMRecord,                                                                                                                                                        
+  targets: TreeSet[IndelRealignmentTarget]):
+    IndelRealignmentTarget = {
+
+  if (targets.size == 1) {
+    if (TargetOrdering.equals (targets.head, read)) {
+      targets.head
+    } else {
+      IndelRealignmentTarget.emptyTarget
+    }
+  } else {
+    val (head, tail) = targets.splitAt(
+      targets.size / 2)
+    val reducedSet = if (TargetOrdering.lt(
+        tail.head, read)) {
+      head
+    } else {
+      tail
+    }
+    mapToTarget (read, reducedSet)
+  }
+}
+\end{lstlisting}
+
+This function is applied as a groupBy against all reads. This means that the function is mapped to the RDD that contains all reads. A new RDD is generated where all
+reads that returned the same indel realignment target are grouped together into a list.
+
+Once all reads are grouped, we identify new candidate alignments. However, before we do this, we left align all indels. For many reads that show evidence of a single
+indel, this can eliminate mismatches that occur after the indel. This involves shifting the indel location to the ``left''\footnote{To a lower position against the reference
+sequence.} by the length of the indel. After this, if the read still shows mismatches, we generate a new consensus alignment. This is done with the
+\emph{generateAlternateConsensus} function, which distills the indel evidence out from the read.
+
+\begin{lstlisting}
+def generateAlternateConsensus (sequence: String,
+  start: Long, cigar: Cigar): Option[Consensus] = {
+  var readPos = 0
+  var referencePos = start
+
+  if (cigar.getCigarElements.filter(elem =>
+        elem.getOperator == CigarOperator.I ||
+        elem.getOperator == CigarOperator.D
+      ).length == 1) {
+    cigar.getCigarElements.foreach(cigarElement =>
+      { cigarElement.getOperator match {
+        case CigarOperator.I => return Some(
+          new Consensus(sequence.substring(readPos,
+            readPos + cigarElement.getLength),
+            referencePos to referencePos))
+        case CigarOperator.D => return Some(
+          new Consensus("",
+          referencePos until (referencePos +
+            cigarElement.getLength)))
+        case _ => {
+          if (cigarElement.getOperator.consumesReadBases &&
+              cigarElement.getOperator.consumesReferenceBases
+              ) {
+            readPos += cigarElement.getLength
+            referencePos += cigarElement.getLength
+          } else {
+            return None
+          }
+        }
+      }
+    })
+    None
+  } else {
+    None
+  }
+}
+\end{lstlisting}
+
+From these consensuses, we generate new haplotypes by inserting the indel consensus into the reference sequence. The quality of each haplotype is measured
+by sliding each read across the new haplotype, using \emph{mismatch quality}. Mismatch quality is defined for a given alignment by the sum of the quality scores
+of all bases that mismatch against the current alignment. While sliding each read across the new haplotype, we aggregate the mismatch quality scores. We take
+the minimum of all of these scores and the mismatch quality of the original alignment. This sweep is performed using the \emph{sweepReadOverReferenceForQuality}
+function:
+
+\begin{lstlisting}
+def sweepReadOverReferenceForQuality (
+    read: String,reference: String,
+    qualities: Seq[Int]): (Int, Int) = {
+  var qualityScores = List[(Int, Int)]()
+
+  for (i <- 0 until (reference.length - read.length)) {
+    qualityScores = (
+      sumMismatchQualityIgnoreCigar(
+        read,
+        reference.substring(i, i + read.length), qualities),
+        i) :: qualityScores
+  }
+
+  qualityScores.reduce ((p1: (Int, Int),
+      p2: (Int, Int)) => {
+    if (p1._1 < p2._1) {
+      p1
+    } else {
+      p2
+    }
+  })
+}
+\end{lstlisting}
+
+If the consensus with the lowest mismatch quality score has a log-odds ratio~(LOD) that is greater than $5.0$ with respect to the reference, we realign the reads.
+This is done by recomputing the cigar and MDTag for each new alignment. Realigned reads have their mapping quality score increased by 10 in the Phred scale.
+
+\subsection{Duplicate Marking\\Implementation}
 \label{sec:duplicate-marking-implementation}
 
 \bibliographystyle{acm}
