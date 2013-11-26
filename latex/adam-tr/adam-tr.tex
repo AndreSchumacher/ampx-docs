@@ -39,9 +39,12 @@ morestring=[b]"}
 \author[1]{Frank~Austin~Nothaft}
 \author[1,2]{Chris~Hartl}
 \author[1]{Christos~Kozanitis}
+\author[3]{Andr\'{e}~Schumacher}
+\author[1]{Anthony~D.~Joseph}
 \author[1]{David~Patterson}
 \affil[1]{Department of Electrical Engineering and Computer Science, University of California, Berkeley}
 \affil[2]{The Broad Institute of MIT and Harvard}
+\affil[3]{International Computer Science Institute, University of California, Berkeley}
 
 \maketitle
 
@@ -67,7 +70,10 @@ new SAM/BAM file~\cite{li09}.
 Because of the amount of time these transformations spend shuffling data to and from disk, these transformations have become
 the bottleneck in modern variant calling pipelines. It currently takes three days to perform these transformations on a high
 coverage BAM file\footnote{A 250GB BAM file at 30$\times$ coverage. See~\S\ref{sec:applications} for a longer discussion}. By
-rewriting these applications to make use of modern in-memory MapReduce frameworks like Apache Spark~\cite{zaharia10}, these transformations can now be completed in FIXME\footnote{FIXME} hours.
+rewriting these applications to make use of modern in-memory MapReduce frameworks like Apache Spark~\cite{zaharia10}, these
+transformations can now be completed in under two hours. Sorting and duplicate mapping alone can be accelerated to take
+50 minutes on a commodity cluster. The format we present also provides many programming efficiencies, as it is easy to
+change evidence access techniques, and is directly portable across many programming languages.
 
 In this paper, we introduce ADAM, which is a programming framework and a set of data formats for cloud scale genomic
 processing. These frameworks and formats scale efficiently to modern cloud computing performance, which allows us to
@@ -78,15 +84,13 @@ application programming interfaces~(APIs)~(\S\ref{sec:data-format-and-api}) and 
 model~(\S\ref{sec:in-memory-programming-model}). Finally, we review the performance and compression gains we
 achieve~(\S\ref{sec:performance}), and outline future enhancements to ADAM that we are working on~(\S\ref{sec:future-work}).
 
-Performance teasers.
-
 \section{Current Genomics Storage Standards}
 \label{sec:current-genomics-storage-standards}
 
 The current de facto standard for the storage and processing of genomics data in read format is BAM. BAM is a binary file
 format that implements the SAM standard for read storage~\cite{li09}. BAM files can be operated on in several languages,
 using either the SAMtools~(\cite{li09}, C++), Picard~(\cite{picard}, Java), and Hadoop-BAM~(\cite{niemenmaa12}, Hadoop
-MapReduce through Java) APIs. BAM provides efficient access and compression over the SAM file format, as its binary
+MapReduce through Java) APIs. BAM provides more efficient access and compression than the SAM file format, as its binary
 encoding reduces several fields into a single byte, and eliminates text processing on load. However, the file format has been
 criticized as it is difficult to process --- the three main APIs that implement the format each note that they do not fully implement
 the format due to its complexity. Additionally, the file format is difficult to use in multiprocessing environments due to its use
@@ -133,13 +137,11 @@ the NA12878 high-coverage human genome.
 \hline
 \bf Stage & \bf GATK 2.7/NA12878 \\
 \hline
-Alignment & 52 hr \\
-Sort & \\
 Mark Duplicates & 13 hr \\
-BQSR & 6 hr \\
-Realignment & 33 hr \\
-Call Variants & 4 hr \\
-\bf Total & \bf 67 hr \\
+BQSR & 9 hr \\
+Realignment & 32 hr \\
+Call Variants & 8 hr \\
+\bf Total & \bf 64 hr \\
 \hline
 \end{tabular}
 \end{center}
@@ -182,7 +184,8 @@ local alignment errors.
 For current implementations of these read processing steps, performance is limited by disk bandwidth. This is because the operations
 read in a SAM/BAM file, perform a bit of processing, and write the data to disk as a new SAM/BAM file. We address this by performing
 our processing iteratively in memory. The four read processing stages can then be chained together, eliminating three dumps to
-disk and an additional three long reads from disk. 
+disk and an additional three long reads from disk. The stages themselves cannot be performed in parallel, but the operations inside each
+stage are data parallel. 
 
 \section{Design Philosophy}
 \label{sec:design-philosophy}
@@ -197,13 +200,11 @@ figure~\ref{fig:stack-model}.
 
 \begin{figure}[h]
 \begin{center}
-\includegraphics[width=0.9\linewidth]{stack-model.pdf}
+\includegraphics[width=0.6\linewidth]{stack-model.pdf}
 \end{center}
 \caption{Stack Models for Networking and Genomics}
 \label{fig:stack-model}
 \end{figure}
-
-REVIEW STACK
 
 The seven levels of our stack model are decomposed as follows:
 
@@ -234,11 +235,8 @@ We can distill our philosophy into three observations that drive our design deci
 \begin{enumerate}
 \item {\bf Scalability is a primary concern for modern genomics systems:} Processing pipelines operate on data that can range in size from
 tens of gigabytes to petabytes. We cannot remove processing stages, as this has an unacceptable impact on accuracy. To increase
-pipeline latency and throughput, our systems must be able to scale efficiently to tens to hundreds of nodes.
+pipeline latency and throughput, our systems must be able to parallelize efficiently to tens to hundreds of compute nodes.
 \item {\bf Bioinformaticans should be concerned with data, not formats:} The SAM/BAM formats do not provide a schema for the data they
-
-REFACTOR THIS
-
 store. This limits visibility into the structure of data being processed. Additionally, it significantly increases implementation difficulty: by
 making the format a primary concern, significant work has been required to introduce programming interfaces that allow these formats to
 be read from different programming languages and environments~\cite{li09,picard,niemenmaa12}.
@@ -250,7 +248,10 @@ maximize its use.
 \end{enumerate}
 
 In the next few sections, we discuss the implementation of ADAM, and how it was designed to satisfy these goals. We then
-analyze the performance of our system and discuss the greater impact of our design philosophy.
+analyze the performance of our system and discuss the greater impact of our design philosophy. We believe that the greatest contribution of
+our stack design is the explicit schema we have introduced. This alone drives the flexibility of the stack: on top of a single exposed schema, it
+is trivial to change the evidence access layer to represent the relevant data in array, or tabular form. This is essential, as it makes it inexpensive
+to support novel access patterns, which can enable new algorithms and applications.
 
 \section{Data Format and API}
 \label{sec:data-format-and-api}
@@ -265,7 +266,8 @@ system~\cite{avro}. The Avro system also provides a human readable schema descri
 auto-generate the schema implementation in several common languages including Scala, Java, C/C++/C\#,
 Python, Ruby, and php. This provides a significant cross-compatibility advantage over the BAM/SAM format,
 where the data format has only been implemented for C/C++ through Samtools and for Java through
-Picard~\cite{li09,picard}.
+Picard~\cite{li09,picard}. To complicate matters, there are well known incompatibilities between these different APIs,
+as well as APIs for accessing variant data~(discussed in~\S\ref{sec:variant-and-genotype-storage}).
 
 We layer this data format inside of the Parquet column store~\cite{parquet}. Parquet is an open source columnar storage
 format that was designed by Cloudera and Twitter, which can be used as a single flat file, a distributed file, or as a database inside of Hive, Shark, or Impala. Columnar stores like Parquet provide several significant advantages when storing genomic data:
@@ -429,7 +431,20 @@ of bases that are mapped to the reverse strand.
 \subsection{Variant and Genotype Storage}
 \label{sec:variant-and-genotype-storage}
 
-Chris H.
+The VCF specification more closely resembles an exchange format than a data format. In particular, the per-site and per-sample fields
+(``\textsc{Info}'' and ``\textsc{Format}'') define arbitrary key-value pairs, for which parsing information is stored in the header of the file.
+This enables side computation (such as classifying a particular SNP as likely or unlikely to damage the structure of a protein) to operate on a VCF
+and store their results. A typical analysis pipeline may comprise of several steps which read in the VCF produced by the previous step, add
+additional annotations to the \textsc{Info} and \textsc{Format} fields, and write a new VCF.
+
+Maintaining full compatibility with VCF presents a structural challenge. Each (properly constructed) VCF file contains the data schema for
+its \textsc{Info} and \textsc{Format} fields within the file header; and potentially every VCF file utilizes a different schema. Maintaining support
+for these catch-all fields by incorporating the file schema within an ADAM-VCF Record violates the layer separation that is a part of the design
+goals: the Evidence Access layer would take on the role of reading format information from a record, and using that to parse the contents of an
+information blob. Furthermore, the format information is ``hidden'' from the Schema layer: the system cannot know what information the record
+should contain until it looks at the format information for the record. This presents challenges to tools, which cannot check whether a field they
+expect is part of the record schema (until runtime), to developers (who will have to write their own parsers for these unstructured blobs), and to
+repository maintainers who need to adjudicate whose (complex) fields and parsers are widely-used enough to merit inclusion and official support.
 
 \begin{table}[h]
 \caption{Genotype Format}
@@ -440,9 +455,26 @@ Chris H.
 \bf Field & \bf Type \\
 \hline
 Sample ID & String \\
-Genotype & Array[Int] \\
-Likelihood (Phred) & Array[Int] \\
-Format & String \\
+Reference Allele & String \\
+Site Alleles & String \\
+Allele 1 & String \\
+Allele 2 & String \\
+Expected 1 Dosage & String \\
+Expected 2 Dosage & String \\
+Genotype Quality & Int \\
+Likelihood (Phred) & String \\
+Posterior Likelihoods & String \\
+Ploidy State Likelihoods & String \\
+Is Phased & Boolean \\
+Phase Switch & Boolean \\
+Phase Set ID & String \\
+Phase Likelihood & Double \\
+Haplotype 1 Quality & Int \\
+Haplotype 2 Quality & Int \\
+RMS Mapping Quality & Double \\
+Depth & Int \\
+Ethnicity & String \\
+Cohort & String \\
 \hline
 \end{tabular}
 \end{center}
@@ -456,23 +488,52 @@ Format & String \\
 \hline
 \bf Field & \bf Type \\
 \hline
+Domain IDs & String \\
+Reference ID & String \\
 Reference Name & String \\
-Position & Long \\
-Variant ID & String \\
-Reference Allele & String \\
-Alternate Alleles & Array[String] \\
-Allele Count & Array[Int] \\
-Chromosome Count & Int \\
-Type & Variant Type \\
-Info & String \\
-Filter & String \\
-Genotypes & Array[AdamGenotype] \\
+Start Position & Long \\
+Site ID & String \\
+Site Quality & Double \\
+Site Filter & String \\
+Ancestral Allele & String \\
+Allele Count & String \\
+Allele Frequency & String \\
+Allele Number & Int \\
+RMS Base Quality & Double \\
+Allellic Alignments & String \\
+In dbSNP? & Boolean \\
+In HM2? & Boolean \\
+In HM3? & Boolean \\
+In 1000G? & Boolean \\
+Site RMS MapQ & Double \\
+MapQ=0 Count & Int \\
+Samples With Data & Int \\
+Strand Bias & Double \\
+Is Somatic? & Boolean \\
+Validated? & Boolean \\
+Callset IDs & String \\
+Callsets Present & Int \\
+Callsets Filtered & Int \\
+Gene IDs & String \\
+Transcript IDs & String \\
 \hline
 \end{tabular}
 \end{center}
 \end{table}
 
-Variant type is one of SNP, multiple nucleotide polymorphism~(MNP), insertion, deletion, structural variant~(SV), or complex.
+The ``narrow waist'' of the ADAM Schema divides the world of parsing and file formats from the world of data presentation and processing.
+To further abuse the allegory of the network stack: just as the transport layer need not worry about how to retrieve data from across a network
+boundary, the access layer of the bioinformatic process should not need to worry about parsing or formatting raw data blobs. The VCF format
+has resulted repeated violations of this principle. While the VCF format is supposed to render a schema for all key value pairs in its \textsc{Info}
+and \textsc{Format} fields, a number of bioinformatics tools do not provide this parsing information, and so types must be inferred. In addition,
+some tools (in particular annotation tools such as VariantEffectPredictor\cite{vep}) serialize rich data types (such as nested maps) into the
+\textsc{Info} field, describing their format as simply ``String''. By adhering rigidly to specific schema, not only do we encourage separation of
+concerns, we also limit extensibility abuse, and the practice of looking at online documentation to understand how to parse a field in a VCF.
+The schema is the documentation, and the parsing is not the tool writer's concern!
+
+These issues extend beyond tools that produce malformed VCFs or uninterpretable schema; the format is ill-supported by APIs that intend to
+support them. For instance, PyVCF always splits on commas, even if the number of values is defined as 1. Thus it mis-parses VariantPredictorOutput
+which is a single (though doubly-delimited by ``,'' and ``|'') field. Similarly to facilitate compression, per-sample fields (are not required to propagate all values. 
 
 \section{In-Memory Programming\\Model}
 \label{sec:in-memory-programming-model}
@@ -515,7 +576,8 @@ the pure read/write throughput of ADAM, and to show how the system scales in a c
 the relevant tests in both ADAM and Hadoop-BAM~\cite{niemenmaa12}, running on Spark on an Amazon Elastic Compute 2 (EC2)
 cluster. We used the $m2.4xlarge$ instance type for all of our tests. This instance type is an 8 core memory optimized machine
 with 68.4 Gibibytes (GiB) of memory per machine. We ran these benchmarks against HG00096, a low-coverage human genome (15 GB
-BAM) from the 1,000 Genomes Project.
+BAM) from the 1,000 Genomes Project. The file used for these experiments can be found on the 1000 Genomes ftp site, \texttt{ftp.1000genomes.ebi.ac.uk} in directory 
+\begin{small}\texttt{/vol1/ftp/data/HG00096/alignment/}\end{small}.
 
 \subsubsection{Read/Write Performance}
 \label{sec:read-write-performance}
@@ -528,7 +590,7 @@ maximized through the use of projections.
 \label{sec:read-length-and-quality}
 
 This microbenchmark scans all the reads in the file, and collects statistics about the length of the read, and the mapping quality score.
-The results of this benchmark can be found in Figure~\ref{fig:length-quality}.
+The results of this benchmark can be found in Figure~\ref{fig:length-quality}. Ideal speedup curves are plotted along with the speedup measurements.
 
 \begin{figure}[h]
 \begin{center}
@@ -537,6 +599,20 @@ The results of this benchmark can be found in Figure~\ref{fig:length-quality}.
 \caption{Read Length and Quality Speedup for HG00096}
 \label{fig:length-quality}
 \end{figure}
+
+The speedups in this graph are plotted relative to the single machine Hadoop-BAM run.
+
+This benchmark demonstrates several things:
+
+\begin{itemize}
+\item ADAM demonstrates superior scalability over Hadoop-BAM. This is likely because ADAM files can be more evenly distributed across machines.
+Hadoop-BAM must guess the proper partitioning when splitting files~\cite{niemenmaa12}. The Parquet file format that ADAM is based on is partitioned
+evenly when it is written\cite{parquet}. This is critical for small files such as the one used in this test~---~in a 16 machine cluster, there is only 1 GB of
+data per node, so imbalances on the order of the Hadoop file split size (128 MB) can lead to 40\% differences in loading between nodes.
+\item Projections can significantly accelerate computation, if the calculation does not need all the data. By projecting the minimum dataset necessary
+to calculate the target of this benchmark, we can accelerate the benchmark by $8\times$. Even a more modest projection leads to a $2\times$
+improvement in performance.
+\end{itemize}
 
 \subsubsection{Predicate Pushdown}
 \label{sec:predicate-pushdown}
@@ -594,7 +670,63 @@ quality threshold:
 \item The read has not been marked as a duplicate.
 \end{itemize}
 
-This threshold is typically applied as one of the first operations in any read processing pipeline. 
+This threshold is typically applied as one of the first operations in any read processing pipeline.
+
+\paragraph{Gapped Predicate:}
+\label{sec:gapped-predicate}
+
+In many applications, the application seeks to look at a region of the genome~(e.g. a single chromosome or gene). We include this
+predicate as a proxy: the gapped predicate looks for 1 out of every $n$ reads. This achieves performance analogous to filtering
+on a single gene, but provides an upper bound as we pay a penalty due to our predicate hits being randomly distributed.
+
+To validate the performance of predicate pushdown, we ran the predicates described above on the HG00096 genome on a
+single AWS $m2.4xlarge$ instance. The goal of this was to determine the rough overhead of predicate projection.
+
+For the gapped predicate, our performance with sweeping $n$ can be found in Figure~\ref{fig:gapped-filter}.
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=\linewidth]{microbenchmarks/gapped_predicate_low_coverage.pdf}
+\end{center}
+\caption{Gapped Predicate on HG00096}
+\label{fig:gapped-filter}
+\end{figure}
+
+There are several conclusions to be drawn from this experiment:
+
+\begin{itemize}
+\item As is demonstrated by equation~(\ref{eqn:predicate}), we see the largest speedup when our predicate read set is significantly
+smaller than our projection read set. For smaller projections, we see a fairly substantial reduction in speedup.
+\item As the number of records that passes the predicate drops, the number of reads done to evaluate the predicate begins to become
+a dominant term. This has one important implication: for applications that plan to access a very small segment of the data, accessing the
+data as a flat file with a predicate is likely not the most efficient access pattern. Rather, if the predicate is regular, it is likely better to access
+the data through a indexed database.
+\end{itemize}
+
+We additionally calculated the performance improvement that was achieved by using predicate pushdown instead of a Spark filter.
+These results can be found in Table~\ref{tab:filter-vs-predicate}.
+
+\begin{table}[h]
+\caption{Predicate Pushdown Speedup vs. Filtering}
+\label{tab:filter-vs-predicate}
+\begin{center}
+\begin{tabular}{| l | c  c c | c |}
+\hline
+\bf Predicate & \bf Min & \bf Avg & \bf Max & \bf Filtered \\
+\hline
+Locus & 1.19 & 1.17 & 0.94 & 3\% \\
+Gapped, $n = 1$ & 1.0 & 1.0 & 1.01 & 0\% \\
+Gapped, $n = 2$ & 1.22 & 1.27 & 1.29 & 50\% \\
+Gapped, $n = 4$ & 1.31 & 1.42 & 1.49 & 75\% \\
+Gapped, $n = 8$ & 1.37 & 1.58 & 1.67 & 87.5\% \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+These results are promising, as they indicate that predicate pushdown is faster than a Spark filter in most cases. We believe that the
+only case that showed a slowdown (max projection on Locus predicate) is due to an issue in our test setup. We therefore can conclude
+that filtering operations that can be performed statically at file load-in should be performed using predicate pushdown.
 
 \subsection{Applications}
 \label{sec:applications}
@@ -613,31 +745,8 @@ information about block (and replica) locations. Breaking large files, like BAM 
 like Spark, to create tasks which run across the entire cluster processing the records inside of each block. 
 The wall clock times presented in the applications below do not consider the time it takes to load data to HDFS.
 
-\begin{table}[h]
-\caption{Time to place a file on HDFS}
-\label{tab:time-flagstat}
-\begin{center}
-\begin{tabular}{| l | c | c |}
-\hline
-\bf File Size  & \bf Cluster Size \\
-\hline
-TODO & TODO \\
-TODO & TODO \\
-\hline
-\end{tabular}
-\end{center}
-\end{table}
-
-TODO: provide some numbers on HDFS load times (including the speedup found using distcp -- e.g. a 250GB on
-S3 can be written to HDFS in just over 20 minutes -- ganglia reported sustained ~450Mb/s). Note: we did not load
-Hadoop-native for these tests which would have helped with performance.
-
 The NA12878 high-coverage BAM file used for these experiments can be found on the 1000 Genomes ftp site, \texttt{ftp.1000genomes.ebi.ac.uk} in directory 
 \begin{small}\texttt{/vol1/ftp/data/NA12878/high\_coverage\_alignment/}\end{small}.
-
-TODO: talk about conversion from BAM to ADAM
-
-TODO: Explain an ADAMRecord
 
 \subsubsection{Flagstat}
 \label{sec:flagstat}
@@ -651,13 +760,13 @@ read statistics on a BAM file, e.g.
 $ samtools flagstat NA12878.bam
 1685229894 + 0 in total (QC-passed reads + QC-failed reads)
 0 + 0 duplicates
-1622164506 + 0 mapped (96.26%:-nan%)
+1622164506 + 0 mapped (96.26\%:-nan\%)
 1685229894 + 0 paired in sequencing
 842614875 + 0 read1
 842615019 + 0 read2
-1602206371 + 0 properly paired (95.07%:-nan%)
+1602206371 + 0 properly paired (95.07\%:-nan\%)
 1611286771 + 0 with itself and mate mapped
-10877735 + 0 singletons (0.65%:-nan%)
+10877735 + 0 singletons (0.65\%:-nan\%)
 3847907 + 0 with mate mapped to a different chr
 2174068 + 0 with mate mapped to a different chr (mapQ>=5)
 \end{verbatim}
@@ -674,7 +783,7 @@ identical information in the same text format.
 \hline
 \bf Software  & \bf Wall clock time \\
 \hline
-Samtools 0.1.19 & 25m24s (todo: verify) \\ 
+Samtools 0.1.19 & 25m24s \\ 
 ADAM 0.5.0 & 0m46s \\
 \hline
 \end{tabular}
@@ -685,8 +794,6 @@ The ADAM \texttt{flagstat} command was run on EC2 with 32 \texttt{cr1.8xlarge} m
 which is, not suprisingly, why ADAM ran 34 times faster. While the samtools \texttt{flagstat}
 command is multi-threaded, it can only be run on a single machine.
 
-TODO: Collect numbers on 
-
 \subsubsection{Sort}
 \label{sec:sort}
 
@@ -694,25 +801,6 @@ When coordinate sorting a BAM file, reads are reordered by reference id and alig
 This sorting makes it easier for downstream tools to find reads for a specific area of the reference
 and makes finding mates in paired-ends reads more efficient. Many utilities will only except 
 BAM files that have been sorted, e.g. Picard MarkDuplicates.
-
-The ADAM Scala code for sorting a BAM file is succinct and relatively 
-easy to follow, e.g.
-
-\begin{scriptsize}
-\begin{verbatim}
- 1: def adamSortReadsByReferencePosition(): RDD[ADAMRecord] = {
- 2:  rdd.map(p => {
- 3:    val referencePos = ReferencePosition(p) match {
- 4:      case None =>
- 5:        // Move unmapped reads to the end
- 6:        ReferencePosition(Int.MaxValue, Long.MaxValue)
- 7:      case Some(pos) => pos
- 8:    }
- 9:    (referencePos, p)
-10:  }).sortByKey().map(p => p._2)
-11: }
-\end{verbatim}
-\end{scriptsize}
 
 Each read is mapped to a tuple with the two values: position and read.
 Unmapped reads that a value of \texttt{None} for \texttt{ReferencePosition}
@@ -727,7 +815,7 @@ are sent to the end of the file.
 \hline
 \bf Software & \bf EC2 profile & \bf Wall clock time \\
 \hline
-Picard Tools 1.102 & TODO & 13h (todo: verify this) \\
+Picard Tools 1.102 & --- & 13h \\
 ADAM 0.5.0 & 32 \texttt{cr1.8xlarge} & 32m38s \\
 ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 20m57s \\ 
 \hline
@@ -751,72 +839,7 @@ improve performance.
 \label{sec:mark-duplicates}
 
 The ADAM algorithm for marking duplicate is nearly identical to Picard's MarkDuplicates
-command. The following ADAM code, reformatted for this report, expresses the algorithm
-succinctly in 42 lines of Scala code, e.g.
-
-\begin{scriptsize}
-\begin{verbatim}
- 1:for (((leftPos, library), readsByLeftPos) <- 
- 2:    rdd.adamSingleReadBuckets()
- 3:       .keyBy(ReferencePositionPair(_))
- 4:       .groupBy(leftPositionAndLibrary);
- 5:
- 6:buckets <- {
- 7:
- 8:leftPos match {
- 9: // These are all unmapped reads. 
-10: // There is no way to determine if they are duplicates
-11: case None =>
-12:    markReads(readsByLeftPos.unzip._2, areDups = false)
-13: // These reads have their left position mapped
-14: case Some(leftPosWithOrientation) =>
-15:   // Group the reads by their right position
-16:   val readsByRightPos = readsByLeftPos.groupBy(rightPosition)
-17:   // Find any reads with no right position
-18:   val fragments = readsByRightPos.get(None)
-19:   // Check if we have any pairs (reads with a right position)
-20:   val hasPairs = readsByRightPos.keys.exists(_.isDefined)
-21:   if (hasPairs) {
-22:     // Since we have pairs, mark all fragments as duplicates
-23:     val processedFrags = if (fragments.isDefined) {
-24:       markReads(fragments.get.unzip._2, areDups = true)
-25:     } else {
-26:       Seq.empty
-27:     }
-28:     val processedPairs = 
-29:         for (buckets <- (readsByRightPos - None).values;
-30:             processedPair <- 
-31:                    scoreAndMarkReads(buckets.unzip._2)) 
-32:        yield processedPair
-33:     processedPairs ++ processedFrags
-34:   } else if (fragments.isDefined) {
-35:     // No pairs. Score the fragments.
-36:     scoreAndMarkReads(fragments.get.unzip._2)
-37:   } else {
-38:     Seq.empty
-39:   }
-40:}
-41:};
-42:read <- buckets.allReads) yield read
-\end{verbatim}
-\end{scriptsize}
-
-For lines 1-4, all reads with the same record group name and read name are collected 
-into buckets. These buckets contain the read and optional mate or secondary alignments.
-Each read bucket is then keyed by 5 $'$ position and orientation and grouped together by
-left (lowest coordinate) position, orientation and library name.
-
-For lines 8-41, we processed each read bucket with a common left 5$'$ position. Unmapped
-reads are never marked duplicate as their position is not known. Mapped reads with a common
-left position are separated into paired reads and fragments. Fragments, in this context,
-are reads that have no mate or should have a mate but it doesn't exist.
-
-If there are pairs in a group, all fragments are marked duplicates and the paired reads are grouped
-by their right 5$'$ position. All paired reads that have a common right and left 5$'$
-position are scored and all but the highest scoring read is marked a duplicate.
-
-If there are no pairs in a group, all fragments are scored and all but the highest scoring fragment
-are marked duplicates.
+command. 
 
 \begin{table}[h]
 \caption{Mark Duplicates for NA12878}
@@ -827,8 +850,7 @@ are marked duplicates.
 \hline
 \bf Software & \bf EC2 profile & \bf Wall clock time \\
 \hline
-Samtools rmdup & TODO? & TODO? \\
-Picard MarkDuplicates 1.102 & TODO & 13h (todo: verify this) \\
+Picard 1.102 & --- & 13h \\
 ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 28m17 \\
 \hline
 \end{tabular}
@@ -836,11 +858,7 @@ ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 28m17 \\
 \end{scriptsize}
 \end{table}
 
-TODO: talk about differences between ADAM and Picard, e.g.
-ADAM does not require sorted input, 
-
-\subsubsection{Mark Duplicates and Sort In-Memory}
-\label{sec:mark-duplicates-sort}
+Due to caching effects, we see a 20\% improvement in performance when we cascade Sort and Mark Duplicates together.
 
 \begin{table}[h]
 \caption{Sort and Mark Duplicates for NA12878}
@@ -851,7 +869,7 @@ ADAM does not require sorted input,
 \hline
 \bf Software & \bf EC2 profile & \bf Wall clock time \\
 \hline
-Picard Tools 1.102 & TODO & 26h (todo: verify this) \\
+Picard Tools 1.102 & --- & 26h \\
 ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 50m45s \\
 \hline
 \end{tabular}
@@ -903,7 +921,8 @@ plenty of memory, they do not have enough disks to help spread the I/O load arou
 \label{sec:compression}
 
 By using dictionary coding, run length encoding with bit-packing, and GZIP compression, ADAM files can be stored using less
-disk space than an equivalent BAM file. 
+disk space than an equivalent BAM file. Typically, ADAM is approximately 75\% of the size of the compressed BAM for the
+same data. If one is performing pileup aggregation, compression can improve to over 50\%.
 
 \section{Future Work}
 \label{sec:future-work}
@@ -940,7 +959,17 @@ to make API implementations available for some of these languages at a later dat
 \section{Discussion}
 \label{sec:discussion}
 
-Table to go here.
+As discussed in this paper, ADAM presents a significant jump for genomics data processing. To summarize, the benefits are as
+follows:
+
+\begin{itemize}
+\item ADAM achieves approximately a $30\times$ speedup when compared to other modern processing pipelines.
+\item ADAM can successfully scale to clusters larger than 100 nodes.
+\item ADAM presents an explicit data schema which makes it straightforward for the data access layer to be changed
+to support new access patterns.
+\end{itemize}
+
+In this section, we discuss a few tradeoffs inherent to ADAM, as well as new applications enabled by ADAM.
 
 \subsection{Columnar vs. Row Storage}
 \label{sec:columnar-vs-row-storage}
@@ -1099,8 +1128,30 @@ license.
 \section{Algorithm Implementations}
 \label{sec:algorithm-implentations}
 
+As ADAM is open source, the source code for the system is freely available. However, the implementations of the algorithms
+are not always trivial. In this section, we highlight the algorithms that underly our read processing pipeline.
+
 \subsection{Sort Implementation}
 \label{sec:sort-implementation}
+
+The ADAM Scala code for sorting a BAM file is succinct and relatively 
+easy to follow. It is provided below for reference.
+
+\begin{lstlisting}
+def adamSortReadsByReferencePosition():
+    RDD[ADAMRecord] = {
+  rdd.map(p => {
+    val referencePos = ReferencePosition(p) match {
+      case None =>
+        // Move unmapped reads to the end
+        ReferencePosition(Int.MaxValue,
+          Long.MaxValue)
+      case Some(pos) => pos
+    }
+    (referencePos, p)
+  }).sortByKey().map(p => p._2)
+}
+\end{lstlisting}
 
 \subsection{BQSR Implementation}
 \label{sec:bqsr-implementation}
@@ -1116,7 +1167,10 @@ Instead it is an embarrassingly parallelizable aggregate. The ADAM implementatio
 def computeTable(rdd: Records, dbsnp: Mask) :
   RecalTable = {
   
-  rdd.aggregate(new RecalTable)(    (table, read) => { table + read },    (table, table) => { table ++ table })}
+  rdd.aggregate(new RecalTable)(
+    (table, read) => { table + read },
+    (table, table) => { table ++ table })
+}
 \end{lstlisting}
 
 The ADAM implementation of BQSR utilizes the MD field to identify bases in the read that mismatch the reference. This enables
@@ -1266,8 +1320,10 @@ def generateAlternateConsensus (sequence: String,
           referencePos until (referencePos +
             cigarElement.getLength)))
         case _ => {
-          if (cigarElement.getOperator.consumesReadBases &&
-              cigarElement.getOperator.consumesReferenceBases
+          if (cigarElement.getOperator
+                .consumesReadBases &&
+              cigarElement.getOperator
+                .consumesReferenceBases
               ) {
             readPos += cigarElement.getLength
             referencePos += cigarElement.getLength
@@ -1296,11 +1352,13 @@ def sweepReadOverReferenceForQuality (
     qualities: Seq[Int]): (Int, Int) = {
   var qualityScores = List[(Int, Int)]()
 
-  for (i <- 0 until (reference.length - read.length)) {
+  for (i <- 0 until (reference.length -
+      read.length)) {
     qualityScores = (
       sumMismatchQualityIgnoreCigar(
         read,
-        reference.substring(i, i + read.length), qualities),
+        reference.substring(i, i + read.length),
+          qualities),
         i) :: qualityScores
   }
 
@@ -1320,6 +1378,79 @@ This is done by recomputing the cigar and MDTag for each new alignment. Realigne
 
 \subsection{Duplicate Marking\\Implementation}
 \label{sec:duplicate-marking-implementation}
+
+The following ADAM code, reformatted for this report, expresses the algorithm succinctly in 42 lines of Scala code.
+
+\begin{lstlisting}
+for (((leftPos, library), readsByLeftPos) <- 
+    rdd.adamSingleReadBuckets()
+       .keyBy(ReferencePositionPair(_))
+       .groupBy(leftPositionAndLibrary);
+
+buckets <- {
+
+leftPos match {
+ // These are all unmapped reads. 
+ // There is no way to determine if
+ // they are duplicates
+ case None =>
+    markReads(readsByLeftPos.unzip._2,
+      areDups = false)
+ // These reads have their left position mapped
+ case Some(leftPosWithOrientation) =>
+   // Group the reads by their right position
+   val readsByRightPos = readsByLeftPos.groupBy(
+     rightPosition)
+   // Find any reads with no right position
+   val fragments = readsByRightPos.get(None)
+   // Check if we have any pairs
+   // (reads with a right position)
+   val hasPairs = readsByRightPos.keys
+     .exists(_.isDefined)
+   if (hasPairs) {
+     // Since we have pairs,
+     // mark all fragments as duplicates
+     val processedFrags = if (fragments.isDefined
+     ) {
+       markReads(fragments.get.unzip._2,
+         areDups = true)
+     } else {
+       Seq.empty
+     }
+     val processedPairs = 
+         for (buckets <- (readsByRightPos - None)
+           .values;
+             processedPair <- 
+                scoreAndMarkReads(buckets.unzip._2)) 
+        yield processedPair
+     processedPairs ++ processedFrags
+   } else if (fragments.isDefined) {
+     // No pairs. Score the fragments.
+     scoreAndMarkReads(fragments.get.unzip._2)
+   } else {
+     Seq.empty
+   }
+};
+read <- buckets.allReads) yield read
+\end{lstlisting}
+
+For lines 1-4, all reads with the same record group name and read name are collected 
+into buckets. These buckets contain the read and optional mate or secondary alignments.
+Each read bucket is then keyed by 5 $'$ position and orientation and grouped together by
+left (lowest coordinate) position, orientation and library name.
+
+For lines 8-41, we processed each read bucket with a common left 5$'$ position. Unmapped
+reads are never marked duplicate as their position is not known. Mapped reads with a common
+left position are separated into paired reads and fragments. Fragments, in this context,
+are reads that have no mate or should have a mate but it doesn't exist.
+
+If there are pairs in a group, all fragments are marked duplicates and the paired reads are grouped
+by their right 5$'$ position. All paired reads that have a common right and left 5$'$
+position are scored and all but the highest scoring read is marked a duplicate.
+
+If there are no pairs in a group, all fragments are scored and all but the highest scoring fragment
+are marked duplicates.
+
 
 \bibliographystyle{acm}
 
