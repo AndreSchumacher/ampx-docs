@@ -593,26 +593,308 @@ This threshold is typically applied as one of the first operations in any read p
 \subsection{Applications}
 \label{sec:applications}
 
+ADAM relies on Apache Spark for in-memory, map-reduce processing. At the heart of Spark is a programming construct,
+called a Resilient Distributed Dataset (RDD), which represents a fault-tolerant collection of elements that are
+operated on in parallel. Programming with an RDD is very similar to programming with any standard Scala collection
+like \texttt{Seq} or \texttt{List}. This polymorphism allows developers to focus on the algorithm they're developing 
+without concerning themselves with the details of distributed computation. The example code presented in this section
+highlight the succinctness and expressiveness of Spark Scala code. While ADAM is currently written exclusively in 
+Scala, Apache Spark also has Java and Python support.
+
+For these applications to be run in a distributed fashion, the data needs to be loaded onto the Hadoop
+Distribute File System (HDFS). HDFS breaks the file into blocks, distributes them across the cluster and maintains
+information about block (and replica) locations. Breaking large files, like BAM files, into blocks allows systems,
+like Spark, to create tasks which run across the entire cluster processing the records inside of each block. 
+The wall clock times presented in the applications below do not consider the time it takes to load data to HDFS.
+
+\begin{table}[h]
+\caption{Time to place a file on HDFS}
+\label{tab:time-flagstat}
+\begin{center}
+\begin{tabular}{| l | c | c |}
+\hline
+\bf File Size  & \bf Cluster Size \\
+\hline
+TODO & TODO \\
+TODO & TODO \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+TODO: provide some numbers on HDFS load times (including the speedup found using distcp -- e.g. a 250GB on
+S3 can be written to HDFS in just over 20 minutes -- ganglia reported sustained ~450Mb/s). Note: we did not load
+Hadoop-native for these tests which would have helped with performance.
+
+The NA12878 high-coverage BAM file used for these experiments can be found on the 1000 Genomes ftp site, \texttt{ftp.1000genomes.ebi.ac.uk} in directory 
+\begin{small}\texttt{/vol1/ftp/data/NA12878/high\_coverage\_alignment/}\end{small}.
+
+TODO: talk about conversion from BAM to ADAM
+
+TODO: Explain an ADAMRecord
+
+\subsubsection{Flagstat}
+\label{sec:flagstat}
+
+Even the simplest application can benefit from the ADAM format and execution
+environment. For example, the samtools \texttt{flagstat} command prints
+read statistics on a BAM file, e.g.
+
+\begin{scriptsize}
+\begin{verbatim}
+$ samtools flagstat NA12878.bam
+1685229894 + 0 in total (QC-passed reads + QC-failed reads)
+0 + 0 duplicates
+1622164506 + 0 mapped (96.26%:-nan%)
+1685229894 + 0 paired in sequencing
+842614875 + 0 read1
+842615019 + 0 read2
+1602206371 + 0 properly paired (95.07%:-nan%)
+1611286771 + 0 with itself and mate mapped
+10877735 + 0 singletons (0.65%:-nan%)
+3847907 + 0 with mate mapped to a different chr
+2174068 + 0 with mate mapped to a different chr (mapQ>=5)
+\end{verbatim}
+\end{scriptsize}
+
+ADAM has a \texttt{flagstat} command which provides 
+identical information in the same text format.
+
+\begin{table}[h]
+\caption{Time to Run Flagstat on High-Coverage NA12878}
+\label{tab:time-flagstat}
+\begin{center}
+\begin{tabular}{| l | c | c |}
+\hline
+\bf Software  & \bf Wall clock time \\
+\hline
+Samtools 0.1.19 & 25m24s (todo: verify) \\ 
+ADAM 0.5.0 & 0m46s \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+The ADAM \texttt{flagstat} command was run on EC2 with 32 \texttt{cr1.8xlarge} machines
+which is, not suprisingly, why ADAM ran 34 times faster. While the samtools \texttt{flagstat}
+command is multi-threaded, it can only be run on a single machine.
+
+TODO: Collect numbers on 
+
 \subsubsection{Sort}
 \label{sec:sort}
 
-Matt
+When coordinate sorting a BAM file, reads are reordered by reference id and alignment start position.
+This sorting makes it easier for downstream tools to find reads for a specific area of the reference
+and makes finding mates in paired-ends reads more efficient. Many utilities will only except 
+BAM files that have been sorted, e.g. Picard MarkDuplicates.
 
-\subsubsection{Base Quality Score Recalibration}
-\label{sec:bqsr-perf}
+The ADAM Scala code for sorting a BAM file is succinct and relatively 
+easy to follow, e.g.
 
-Chris
+\begin{scriptsize}
+\begin{verbatim}
+ 1: def adamSortReadsByReferencePosition(): RDD[ADAMRecord] = {
+ 2:  rdd.map(p => {
+ 3:    val referencePos = ReferencePosition(p) match {
+ 4:      case None =>
+ 5:        // Move unmapped reads to the end
+ 6:        ReferencePosition(Int.MaxValue, Long.MaxValue)
+ 7:      case Some(pos) => pos
+ 8:    }
+ 9:    (referencePos, p)
+10:  }).sortByKey().map(p => p._2)
+11: }
+\end{verbatim}
+\end{scriptsize}
 
-\subsubsection{Indel Realignment}
-\label{sec:indel-realignment}
+Each read is mapped to a tuple with the two values: position and read.
+Unmapped reads that a value of \texttt{None} for \texttt{ReferencePosition}
+are sent to the end of the file.
 
-Frank
+\begin{table}[h]
+\caption{Sort NA12878}
+\label{tab:time-flagstat}
+\begin{scriptsize}
+\begin{center}
+\begin{tabular}{| l | c | c |}
+\hline
+\bf Software & \bf EC2 profile & \bf Wall clock time \\
+\hline
+Picard Tools 1.102 & TODO & 13h (todo: verify this) \\
+ADAM 0.5.0 & 32 \texttt{cr1.8xlarge} & 32m38s \\
+ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 20m57s \\ 
+\hline
+\end{tabular}
+\end{center}
+\end{scriptsize}
+\end{table}
+
+ADAM was run on an EC2 cluster with 32 \texttt{cr1.8xlarge} machines and
+a cluster with 100 \texttt{m2.4xlarge} instances.
+
+Monitoring the Spark console during sorting revealed that the \texttt{sortByKey}
+operation (on line 10 above) took a total of 1 min 37 secs. The \texttt{map} operation
+(at line 2 above) took 1 min 48 secs, and the remainder of the time, 29 min 25 secs, was 
+spent writing the results to HDFS. There were a total of 1586 tasks with a majority
+finishing in under 10 minutes. A sole traggling task took 29 min 25 secs to write
+all unmapped reads. This indicates that using a custom partitioner could dramatically
+improve performance.
 
 \subsubsection{Mark Duplicates}
 \label{sec:mark-duplicates}
 
-Matt
+The ADAM algorithm for marking duplicate is nearly identical to Picard's MarkDuplicates
+command. The following ADAM code, reformatted for this report, expresses the algorithm
+succinctly in 42 lines of Scala code, e.g.
 
+\begin{scriptsize}
+\begin{verbatim}
+ 1:for (((leftPos, library), readsByLeftPos) <- 
+ 2:    rdd.adamSingleReadBuckets()
+ 3:       .keyBy(ReferencePositionPair(_))
+ 4:       .groupBy(leftPositionAndLibrary);
+ 5:
+ 6:buckets <- {
+ 7:
+ 8:leftPos match {
+ 9: // These are all unmapped reads. 
+10: // There is no way to determine if they are duplicates
+11: case None =>
+12:    markReads(readsByLeftPos.unzip._2, areDups = false)
+13: // These reads have their left position mapped
+14: case Some(leftPosWithOrientation) =>
+15:   // Group the reads by their right position
+16:   val readsByRightPos = readsByLeftPos.groupBy(rightPosition)
+17:   // Find any reads with no right position
+18:   val fragments = readsByRightPos.get(None)
+19:   // Check if we have any pairs (reads with a right position)
+20:   val hasPairs = readsByRightPos.keys.exists(_.isDefined)
+21:   if (hasPairs) {
+22:     // Since we have pairs, mark all fragments as duplicates
+23:     val processedFrags = if (fragments.isDefined) {
+24:       markReads(fragments.get.unzip._2, areDups = true)
+25:     } else {
+26:       Seq.empty
+27:     }
+28:     val processedPairs = 
+29:         for (buckets <- (readsByRightPos - None).values;
+30:             processedPair <- 
+31:                    scoreAndMarkReads(buckets.unzip._2)) 
+32:        yield processedPair
+33:     processedPairs ++ processedFrags
+34:   } else if (fragments.isDefined) {
+35:     // No pairs. Score the fragments.
+36:     scoreAndMarkReads(fragments.get.unzip._2)
+37:   } else {
+38:     Seq.empty
+39:   }
+40:}
+41:};
+42:read <- buckets.allReads) yield read
+\end{verbatim}
+\end{scriptsize}
+
+For lines 1-4, all reads with the same record group name and read name are collected 
+into buckets. These buckets contain the read and optional mate or secondary alignments.
+Each read bucket is then keyed by 5 $'$ position and orientation and grouped together by
+left (lowest coordinate) position, orientation and library name.
+
+For lines 8-41, we processed each read bucket with a common left 5$'$ position. Unmapped
+reads are never marked duplicate as their position is not known. Mapped reads with a common
+left position are separated into paired reads and fragments. Fragments, in this context,
+are reads that have no mate or should have a mate but it doesn't exist.
+
+If there are pairs in a group, all fragments are marked duplicates and the paired reads are grouped
+by their right 5$'$ position. All paired reads that have a common right and left 5$'$
+position are scored and all but the highest scoring read is marked a duplicate.
+
+If there are no pairs in a group, all fragments are scored and all but the highest scoring fragment
+are marked duplicates.
+
+\begin{table}[h]
+\caption{Mark Duplicates for NA12878}
+\label{tab:time-mark-duplicates}
+\begin{scriptsize}
+\begin{center}
+\begin{tabular}{| l | c | c |}
+\hline
+\bf Software & \bf EC2 profile & \bf Wall clock time \\
+\hline
+Samtools rmdup & TODO? & TODO? \\
+Picard MarkDuplicates 1.102 & TODO & 13h (todo: verify this) \\
+ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 28m17 \\
+\hline
+\end{tabular}
+\end{center}
+\end{scriptsize}
+\end{table}
+
+TODO: talk about differences between ADAM and Picard, e.g.
+ADAM does not require sorted input, 
+
+\subsubsection{Mark Duplicates and Sort In-Memory}
+\label{sec:mark-duplicates-sort}
+
+\begin{table}[h]
+\caption{Sort and Mark Duplicates for NA12878}
+\label{tab:time-mark-duplicates-sort}
+\begin{scriptsize}
+\begin{center}
+\begin{tabular}{| l | c | c |}
+\hline
+\bf Software & \bf EC2 profile & \bf Wall clock time \\
+\hline
+Picard Tools 1.102 & TODO & 26h (todo: verify this) \\
+ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 50m45s \\
+\hline
+\end{tabular}
+\end{center}
+\end{scriptsize}
+\end{table}
+
+
+
+
+\subsection{Tuning Spark on EC2}
+
+All applications were run on Amazon EC2 with minimal tuning. The performance numbers in this report
+should not be considered best case performance numbers.
+
+An important Apache Spark property is \texttt{spark.default.parallelism} which controls the number
+of tasks to use for distributed shuffle operations. This value needs to be tuned to match the
+underlying cluster that Spark is running on.
+
+\begin{table}[h]
+\caption{Time to Sort NA12878}
+\label{tab:time-sort-parallelism}
+\begin{center}
+\begin{tabular}{| l | c | c |}
+\hline
+\bf \small{spark.default.parallelism} & \bf Wall clock time \\
+\hline
+500 & 47 min 10 secs \\
+48 & 32 min 38 secs \\ 
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+The following graph shows CPU time series for two sort operations on a 32-node \texttt{cr1.8xlarge}
+EC2 cluster running back to back with different values for \texttt{spark.default.parallelism}.
+The early CPU profile is when \texttt{spark.default.parallelism} is set to 500 and the latter profile
+is when it's set to 48. You can see from the graph that with the higher level of parallelism
+there is a significantly higher amount of system CPU (in red) as 32 CPUs contend for access to 
+the two disks in each \texttt{cr1.8xlarge} instance. While \texttt{cr1.8xlarge} instances provide
+plenty of memory, they do not have enough disks to help spread the I/O load around.
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=0.9\linewidth]{images/Ganglia CPU Graph.png}
+\end{center}
+\caption{Comparison of 500 to 48 parallelism}
+\label{fig:parallelism}
+\end{figure}
 
 \subsection{Compression}
 \label{sec:compression}
