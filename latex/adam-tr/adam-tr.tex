@@ -42,7 +42,7 @@
 Current genomics applications are dominated by the movement of data to and from disk. This data movement pattern
 is a significant bottleneck that prevents these applications from scaling well to distributed computing clusters. In this report,
 we introduce a new set of data formats and programming patterns for genomics applications using in-memory MapReduce
-frameworks. These formats improve application performance, data storage efficiency, and programmer productivity.
+frameworks. These formats and frameworks improve application performance, data storage efficiency, and programmer productivity.
 
 \section{Introduction}
 \label{sec:introduction}
@@ -57,8 +57,7 @@ new SAM/BAM file~\cite{li09}.
 Because of the amount of time these transformations spend shuffling data to and from disk, these transformations have become
 the bottleneck in modern variant calling pipelines. It currently takes three days to perform these transformations on a high
 coverage BAM file\footnote{A 250GB BAM file at 30$\times$ coverage. See~\S\ref{sec:applications} for a longer discussion}. By
-rewriting these applications to make use of modern in-memory MapReduce frameworks like Spark~\cite{zaharia10}, these
-transformations can now be completed in FIXME\footnote{FIXME} hours.
+rewriting these applications to make use of modern in-memory MapReduce frameworks like Apache Spark~\cite{zaharia10}, these transformations can now be completed in FIXME\footnote{FIXME} hours.
 
 In this paper, we introduce ADAM, which is a programming framework and a set of data formats for cloud scale genomic
 processing. These frameworks and formats scale efficiently to modern cloud computing performance, which allows us to
@@ -153,7 +152,7 @@ Detection of duplicate reads requires matching all reads by their 5$'$ position 
 identical position and orientation are assumed to be duplicates. When a group of duplicate reads is found, each read is scored
 and all, but the top-scoring read, are marked as duplicates. Approximately 66\% of duplicates marked in this way are true
 duplicates caused by PCR-induced duplication while the remaining 33\% are caused by the random distribution of read ends\cite{20565776}.
-There is currently no way to seperate "true" duplicates from randomly occuring duplicates.
+There is currently no way to separate "true" duplicates from randomly occurring duplicates.
 
 \paragraph{Base Quality Score Recalibration:} 
 \label{sec:bqsr}
@@ -259,8 +258,7 @@ where the data format has only been implemented for C/C++ through Samtools and f
 Picard~\cite{li09,picard}.
 
 We layer this data format inside of the Parquet column store~\cite{parquet}. Parquet is an open source columnar storage
-format that was designed by Twitter, which can be used as a single flat file, a distributed file, or as a database inside of
-Hive, Shark, or Impala. Columnar stores like Parquet provide several significant advantages when storing genomic data:
+format that was designed by Cloudera and Twitter, which can be used as a single flat file, a distributed file, or as a database inside of Hive, Shark, or Impala. Columnar stores like Parquet provide several significant advantages when storing genomic data:
 
 \begin{itemize}
 \item Column stores enable predicate pushdown~\cite{lamb12}, which minimizes the amount of data read from disk. When
