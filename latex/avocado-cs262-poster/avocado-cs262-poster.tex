@@ -148,8 +148,27 @@ scale (60 hrs/genome), and are inaccurate for high complexity regions (error is 
 \end{minipage}
 }
 \colorbox{White}{
-\begin{minipage}[t][400pt][t]{\linewidth}
-\hfill
+\begin{minipage}[t][400pt][t]{0.3\linewidth}
+\vspace{20pt}
+\includegraphics[width=0.9\linewidth]{assembly-fig.pdf}
+\pagebreak
+\end{minipage}
+\begin{minipage}[t][400pt][t]{0.7\linewidth}
+\vspace{20pt}
+\LARGE We partition the high-complexity locations into regions and use local
+$k$-mer assembly to discover the most likely haplotype pair per region.
+%The $k$-mer assembly slices the reads in a region into $k$-mer edges (i.e.,
+%strings of length $k$), and the overlaps between edges form the $k$-mer graph.
+The likelihood of a pair of haplotypes $H_j$ and $H_{j'}$ is given by:
+\large $$ \mathcal{L}(H_j,H_{j'})=\prod_i\left[ \frac{P(r_i|H_j)}{2}+\frac{P(r_i|H_{j'})}{2} \right] $$
+\LARGE where $r_i$ is a read.
+We obtain $P(r|H)$ by a pairwise HMM alignment model.
+
+\small \hfill
+
+\small Figure credit:
+  P.E.C.~Compeau, P.A.~Pevner, G.~Tesler,
+  ``How to apply de Bruijn graphs to genome assembly,'' Nature Biotech.~29(11), 2011.
 \pagebreak
 \end{minipage}
 }
