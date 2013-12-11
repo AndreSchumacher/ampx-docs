@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.1415926-2.3-1.40.12 (TeX Live 2011) (format=pdflatex 2011.7.3)  14 OCT 2013 21:48
+This is pdfTeX, Version 3.1415926-2.3-1.40.12 (TeX Live 2011) (format=pdflatex 2011.7.3)  15 OCT 2013 11:17
 entering extended mode
  \write18 enabled.
  file:line:error style messages enabled.
@@ -219,14 +219,11 @@ m/n/10 http : / / www . genome . gov /
 
 LaTeX Warning: There were undefined references.
 
-
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
-
  ) 
 Here is how much of TeX's memory you used:
  1615 strings out of 493633
  23267 string characters out of 3143378
- 78156 words of memory out of 3000000
+ 78157 words of memory out of 3000000
  4909 multiletter control sequences out of 15000+200000
  10846 words of font info for 38 fonts, out of 3000000 for 9000
  831 hyphenation exceptions out of 8191
