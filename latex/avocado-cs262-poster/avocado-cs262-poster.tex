@@ -105,8 +105,8 @@ scale (60 hrs/genome), and are inaccurate for high complexity regions (error is 
 \end{center} 
 \textbf{Design Principles:}
 \begin{itemize}
-\item Reuse read processing stages from ADAM
 \item Use mapping quality/coverage as filtering heuristic
+\item Use assembly methods on high complexity regions
 \item Design is modular: easy to add new calling algorithms
 \end{itemize}
 \pagebreak
@@ -132,7 +132,44 @@ scale (60 hrs/genome), and are inaccurate for high complexity regions (error is 
 }
 \colorbox{White}{
 \begin{minipage}[t][500pt][t]{\linewidth}
+\begin{minipage}{0.3\linewidth}
+\LARGE
+\color{Blue}
+\textbf{Notes:}
+\begin{itemize}
+\item Algorithm is currently disk bound due to shuffles:
+performance bug in pileup creation due to partitioning
+\item Plan to fix performance bug by doing interval-based rod conversion: 
+\Large
+\begin{itemize}
+\item Lump reads by reference position group to maintain locality
+\item Fewer objects created than reads $\to$ pileups $\to$ rods
+\end{itemize}
+\end{itemize}
+\end{minipage}
+\begin{minipage}{0.03\linewidth}
 \hfill
+\pagebreak
+\end{minipage}
+\begin{minipage}{0.3\linewidth}
+\includegraphics[width=\linewidth]{speedup_na12878_chr11.pdf}
+\end{minipage}
+\begin{minipage}{0.03\linewidth}
+\hfill
+\pagebreak
+\end{minipage}
+\begin{minipage}{0.3\linewidth}
+\color{Blue}
+\begin{center}
+\includegraphics[width=\linewidth]{complexity_sweep.pdf}
+\% Reads in High Complexity Region
+\end{center}
+\color{Blue}
+\begin{center}
+\includegraphics[width=\linewidth]{dataset_runs.pdf}
+Performance Over Different Datasets
+\end{center}
+\end{minipage}
 \pagebreak
 \end{minipage}
 }
@@ -155,6 +192,7 @@ scale (60 hrs/genome), and are inaccurate for high complexity regions (error is 
 \end{minipage}
 \begin{minipage}[t][400pt][t]{0.7\linewidth}
 \vspace{20pt}
+\color{Blue}
 \LARGE We partition the high-complexity locations into regions and use local
 $k$-mer assembly to discover the most likely haplotype pair per region.
 %The $k$-mer assembly slices the reads in a region into $k$-mer edges (i.e.,
