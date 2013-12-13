@@ -742,14 +742,140 @@ without concerning themselves with the details of distributed computation. The e
 highlight the succinctness and expressiveness of Spark Scala code. While ADAM is currently written exclusively in 
 Scala, Apache Spark also has Java and Python support.
 
+Code written in Apache Spark can be run multi-threaded on a single machine or across a large cluster without modification.
 For these applications to be run in a distributed fashion, the data needs to be loaded onto the Hadoop
 Distribute File System (HDFS). HDFS breaks the file into blocks, distributes them across the cluster and maintains
 information about block (and replica) locations. Breaking large files, like BAM files, into blocks allows systems,
 like Spark, to create tasks which run across the entire cluster processing the records inside of each block. 
-The wall clock times presented in the applications below do not consider the time it takes to load data to HDFS.
 
-The NA12878 high-coverage BAM file used for these experiments can be found on the 1000 Genomes ftp site, \texttt{ftp.1000genomes.ebi.ac.uk} in directory 
-\begin{small}\texttt{/vol1/ftp/data/NA12878/high\_coverage\_alignment/}\end{small}.
+The NA12878 high-coverage BAM file used for these experiments can be found on the 1000 Genomes ftp site, 
+\texttt{ftp.1000genomes.ebi.ac.uk} in directory \begin{small}\texttt{/vol1/ftp/data/NA12878/high\_coverage\_alignment/}\end{small}.
+
+\subsection{Single Node Performance}
+
+A single \texttt{hs1.8xlarge} Amazon EC2 instance was used to compare the performance of ADAM to Picard Tools 1.103.
+This \texttt{hs1.8xlarge} instance has 16 vCPU, 117 GB Memory and 24 2,048 GB HDD drives that can
+deliver 2.4 GB/s of 2 MB sequential read performance and 2.6 GB/s of sequential write performance. 
+
+The 24 disk were configured into a single RAID 0 configuration using \texttt{mdadm} to provide a single 44TB partition for tests.
+Measurements using \texttt{hdparm} showed buffered disk reads at 1.4 GB/sec and cached reads at 6.1 GB/sec.
+
+The AMI used, \texttt{ami-be1c848e}, was a stock Amazon Linux AMI for x86\_64 paravirtualized and EBS backed. Aside
+from creating the RAID 0 partition above, the only modification to the system was increasing the limit for file
+handles from 1024 to 65535. This increase was needed to handle the large number of files that Picard and ADAM spill to disk during
+processing. All single-node tests were performed on the same EC2 instance.
+
+OpenJDK 1.6.0\_24 (Sun Microsystems Inc.) was used for all single-node tests.
+
+\subsubsection{Picard Whole Genome Sorting}
+\label{sec:single-sort-picard}
+
+Picard's SamSort tool was used to sort the NA12878 whole genome BAM file using the following options as output
+by Picard at startup.
+
+\begin{lstlisting}
+net.sf.picard.sam.SortSam \
+INPUT=/mnt/NA12878.bam \
+OUTPUT=/mnt/NA12878.sorted.bam \
+SORT_ORDER=coordinate \
+VALIDATION_STRINGENCY=SILENT \
+MAX_RECORDS_IN_RAM=5000000 \
+VERBOSITY=INFO \
+QUIET=false \
+COMPRESSION_LEVEL=5 \
+CREATE_INDEX=false \
+CREATE_MD5_FILE=false
+\end{lstlisting}
+
+The RAID 0 partition was also used as the java temporary directory using Java property
+\texttt{java.io.tmpdir} ensuring that Picard was spilling intermediate files to a fast and large partition.
+Picard was also given 64 GB of memory using the Java \texttt{-Xmx64g} flag. Because of the large amount of memory available,
+the \texttt{MAX\_RECORDS\_IN\_RAM} was set to \texttt{5000000} which is ten times larger than the Picard default.
+
+Picard took 17 hours 44 minutes wall clock time to sort the NA12878 whole genome BAM file spending 17 hours 31 minutes of user and
+1 hour of system CPU time.
+
+Since Picard isn't multi-threaded, only a
+single CPU was utilitized at nearly 100\% during the entire sort. Memory usage didn't grow beyond 30GB (even
+though 64GB was available) which seems to indicate that \texttt{MAX\_RECORDS\_IN\_RAM} could have been set even higher.
+\texttt{dstat} reported disk utilization of 40M/s reading and writing during the initial 4.5 hours of sorting which
+dropped to 5M/s reading and 8M/s writing during the last 13.25 hours when the final merging of spilled files occured.
+Picard spilled 386G of data during the sort.
+
+\subsubsection{ADAM Whole Genome Sorting}
+\label{sec:single-sort-adam}
+
+The following ADAM command was used to sort the NA12878 whole genome BAM file and save the results to the 
+ADAM Avro/Parquet format.
+
+\begin{lstlisting}
+$ java -Xmx111g \
+-Dspark.default.parallelism=32 \
+-Dspark.local.dir=/mnt/spark \
+-jar adam-0.5.0-SNAPSHOT.jar \
+transform -sort_reads \
+NA12878.bam \
+NA12878.sorted.adam
+\end{lstlisting}
+
+ADAM took 8 hours 56 minutes wall clock time to sort the whole genome using 126 hours of user and 2 hours 52 minutes of 
+system CPU time. 
+
+During the initial key sort stage, ADAM was reading the BAM at ~75M/s with about 60\% CPU utilization for a little over
+90 minutes. During the map phase, \texttt{dstat} reported 40M/s reading and 85M/s writing to disk. The shuffle wrote
+452.6GB of data to disk. During the final stage of saving the results to the Avro/Parquet format, all CPUs were at
+~100\% usage and disk i/o was relatively lighter at ~25M/s. RAM usage peaked at 73GB of the 111GB available to the VM.
+
+\subsubsection{Whole Genome Mark Duplicates}
+\label{sec:single-node-whole-genome}
+
+Picard's MarkDuplicates tool was used to mark duplicates in the NA12878 whole genome BAM file.
+
+\begin{lstlisting}
+net.sf.picard.sam.MarkDuplicates \
+INPUT=[/mnt/NA12878.sorted.bam] \
+OUTPUT=/mnt/NA12878.markdups.bam \
+METRICS_FILE=metrics.txt \
+VALIDATION_STRINGENCY=SILENT \
+PROGRAM_RECORD_ID=MarkDuplicates \
+PROGRAM_GROUP_NAME=MarkDuplicates \
+REMOVE_DUPLICATES=false \
+ASSUME_SORTED=false \
+MAX_SEQUENCES_FOR_DISK_READ_ENDS_MAP=50000 \
+MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=8000 \
+SORTING_COLLECTION_SIZE_RATIO=0.25 \
+READ_NAME_REGEX=[a-zA-Z0-9]+:[0-9]:([0-9]+):([0-9]+):([0-9]+).* \
+OPTICAL_DUPLICATE_PIXEL_DISTANCE=100 \
+VERBOSITY=INFO \
+QUIET=false \
+COMPRESSION_LEVEL=5 \
+MAX_RECORDS_IN_RAM=500000 \
+CREATE_INDEX=false \
+CREATE_MD5_FILE=false
+\end{lstlisting}
+
+\subsubsection{Single Node Performance Summary}
+\label{sec:single-node-summary}
+
+\begin{table}[h]
+\caption{Single Node Runtime Comparison}
+\label{tab:single-node-performance}
+\begin{center}
+\begin{tabular}{| l | c | c |}
+\hline
+\bf Application & \bf Runtime & \bf ADAM Runtime \\
+\hline
+SamSort & 17 h 44 m & 8 h 56 m \\
+MarkDuplicates & 20 h 6 m & - \\  
+Flagstat & TODO & TODO \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+\subsection{Cluster Performance}
+
+ADAM's performance can be scaled by distributing work across a cluster of machines.
 
 \subsubsection{Flagstat}
 \label{sec:flagstat}
