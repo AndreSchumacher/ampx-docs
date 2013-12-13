@@ -27,6 +27,9 @@ morestring=[b]"}
 % Default settings for code listings
 \lstset{frame=tb,language=scala,aboveskip=3mm,belowskip=3mm,showstringspaces=false,columns=flexible,basicstyle={\small\ttfamily}}
 
+\renewcommand\Authfont{\fontsize{12}{14.4}\selectfont}
+\renewcommand\Affilfont{\fontsize{9}{10.8}\selectfont}
+
 \theoremstyle{plain}
 
 \widowpenalty=500
@@ -449,81 +452,6 @@ should contain until it looks at the format information for the record. This pre
 expect is part of the record schema (until runtime), to developers (who will have to write their own parsers for these unstructured blobs), and to
 repository maintainers who need to adjudicate whose (complex) fields and parsers are widely-used enough to merit inclusion and official support.
 
-\begin{table}[h]
-\caption{Genotype Format}
-\label{tab:genotype-format}
-\begin{center}
-\begin{tabular}{| l | c |}
-\hline
-\bf Field & \bf Type \\
-\hline
-Sample ID & String \\
-Reference Allele & String \\
-Site Alleles & String \\
-Allele 1 & String \\
-Allele 2 & String \\
-Expected 1 Dosage & String \\
-Expected 2 Dosage & String \\
-Genotype Quality & Int \\
-Likelihood (Phred) & String \\
-Posterior Likelihoods & String \\
-Ploidy State Likelihoods & String \\
-Is Phased & Boolean \\
-Phase Switch & Boolean \\
-Phase Set ID & String \\
-Phase Likelihood & Double \\
-Haplotype 1 Quality & Int \\
-Haplotype 2 Quality & Int \\
-RMS Mapping Quality & Double \\
-Depth & Int \\
-Ethnicity & String \\
-Cohort & String \\
-\hline
-\end{tabular}
-\end{center}
-\end{table}
-
-\begin{table}[h]
-\caption{Variant Format}
-\label{tab:variant-format}
-\begin{center}
-\begin{tabular}{| l | c |}
-\hline
-\bf Field & \bf Type \\
-\hline
-Domain IDs & String \\
-Reference ID & String \\
-Reference Name & String \\
-Start Position & Long \\
-Site ID & String \\
-Site Quality & Double \\
-Site Filter & String \\
-Ancestral Allele & String \\
-Allele Count & String \\
-Allele Frequency & String \\
-Allele Number & Int \\
-RMS Base Quality & Double \\
-Allellic Alignments & String \\
-In dbSNP? & Boolean \\
-In HM2? & Boolean \\
-In HM3? & Boolean \\
-In 1000G? & Boolean \\
-Site RMS MapQ & Double \\
-MapQ=0 Count & Int \\
-Samples With Data & Int \\
-Strand Bias & Double \\
-Is Somatic? & Boolean \\
-Validated? & Boolean \\
-Callset IDs & String \\
-Callsets Present & Int \\
-Callsets Filtered & Int \\
-Gene IDs & String \\
-Transcript IDs & String \\
-\hline
-\end{tabular}
-\end{center}
-\end{table}
-
 The ``narrow waist'' of the ADAM Schema divides the world of parsing and file formats from the world of data presentation and processing.
 To further abuse the allegory of the network stack: just as the transport layer need not worry about how to retrieve data from across a network
 boundary, the access layer of the bioinformatic process should not need to worry about parsing or formatting raw data blobs. The VCF format
@@ -534,9 +462,110 @@ some tools (in particular annotation tools such as VariantEffectPredictor\cite{v
 concerns, we also limit extensibility abuse, and the practice of looking at online documentation to understand how to parse a field in a VCF.
 The schema is the documentation, and the parsing is not the tool writer's concern!
 
+\begin{table}
+\caption{Genotype Format}
+\label{tab:genotype-format}
+\begin{center}
+\begin{tabular}{| l | c |}
+\hline
+\bf Field & \bf Type \\
+\hline
+Reference ID & String \\
+Reference Name & String \\
+Reference Length & Long \\
+Reference URL & String \\
+Position & Long \\
+Sample ID & String \\
+Ploidy & Int \\
+Haplotype Number & Int \\
+Allele Variant Type & Variant Type \\
+Allele & String \\
+Is Reference? & Boolean \\
+Reference Allele & String \\
+Expected Allele Dosage & Double \\
+Genotype Quality & Int \\
+Depth & Int \\
+Phred Likelihoods & String \\
+Phred Posterior Likelihoods & String \\
+Ploidy State Genotype Likelihoods & String \\
+Haplotype Quality & Int \\
+RMS Base Quality & Int \\
+RMS Mapping Quality & Int \\
+Reads Mapped Forward Strand & Int \\
+Reads Mapped, MapQ == 0 & Int \\
+SV Type & SV Type \\
+SV Length & Long \\
+SV Is Precise? & Boolean \\
+SV End & Long \\
+SV Confidence Interval Start Low & Long \\ 
+SV Confidence Interval Start High & Long \\
+SV Confidence Interval End Low & Long \\ 
+SV Confidence Interval End High & Long \\
+Is Phased? & Boolean \\
+Is Phase Switch? & Boolean \\
+Phase Set ID & String \\
+Phase Quality & Int \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{table}
+\caption{Variant Format}
+\label{tab:variant-format}
+\begin{center}
+\begin{tabular}{| l | c |}
+\hline
+\bf Field & \bf Type \\
+\hline
+Reference ID & String \\
+Reference Name & String \\
+Reference Length & Long \\
+Reference URL & String \\
+Position & Long \\
+Reference Allele & String \\
+Is Reference? & Boolean \\
+Variant & String \\
+Variant Type & Variant Type \\
+ID & String \\
+Quality & Int \\
+Filters & String \\
+Filters Run? & Boolean \\
+Allele Frequency & String \\
+RMS Base Quality & Int \\
+Site RMS MapQ & Double \\
+MapQ=0 Count & Int \\
+Samples With Data & Int \\
+Total Number Of Samples & Int \\
+Strand Bias & Double \\
+SV Type & SV Type \\
+SV Length & Long \\
+SV Is Precise? & Boolean \\
+SV End & Long \\
+SV Confidence Interval Start Low & Long \\ 
+SV Confidence Interval Start High & Long \\
+SV Confidence Interval End Low & Long \\ 
+SV Confidence Interval End High & Long \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
 These issues extend beyond tools that produce malformed VCFs or uninterpretable schema; the format is ill-supported by APIs that intend to
 support them. For instance, PyVCF always splits on commas, even if the number of values is defined as 1. Thus it mis-parses VariantPredictorOutput
 which is a single (though doubly-delimited by ``,'' and ``|'') field. Similarly to facilitate compression, per-sample fields (are not required to propagate all values. 
+
+To address this issue, we eliminate the attributes from the Variant and Genotype schemas. Instead, we provide an internal relational model
+which allows additional fields to be provided by specifying an explicit schema. At runtime, an ADAMVariantContext class is provided that
+handles the correct joining of this data. This eliminates the need for an attributes section and the parsing incompatibilities related to this section,
+while maintaining the ability to arbitrarily introduce new fields as necessary. This provides all the flexibility of the current VCF format, while eliminating
+the pain points.
+
+An additional benefit of the new Variant and Genotype schemas is that they have been designed to ensure that all Variant call information
+can be reconstructed using the called sample genotypes. This functionality is important for genomics projects where many samples are being
+sequenced and called together, but where different views of the sample population are wished to be provided to different scientists. In this situation,
+the total call set would be filtered for a subset of samples. From these collected genotypes, we would then recompute the variant calls and variant
+call statistics, which would then be provided as an output.
 
 \section{In-Memory Programming\\Model}
 \label{sec:in-memory-programming-model}
@@ -844,7 +873,8 @@ ASSUME_SORTED=false \
 MAX_SEQUENCES_FOR_DISK_READ_ENDS_MAP=50000 \
 MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=8000 \
 SORTING_COLLECTION_SIZE_RATIO=0.25 \
-READ_NAME_REGEX=[a-zA-Z0-9]+:[0-9]:([0-9]+):([0-9]+):([0-9]+).* \
+READ_NAME_REGEX=
+[a-zA-Z0-9]+:[0-9]:([0-9]+):([0-9]+):([0-9]+).* \
 OPTICAL_DUPLICATE_PIXEL_DISTANCE=100 \
 VERBOSITY=INFO \
 QUIET=false \
@@ -866,8 +896,7 @@ CREATE_MD5_FILE=false
 \bf Application & \bf Runtime & \bf ADAM Runtime \\
 \hline
 SamSort & 17 h 44 m & 8 h 56 m \\
-MarkDuplicates & 20 h 6 m & - \\  
-Flagstat & TODO & TODO \\
+MarkDuplicates & 20 h 6 m & --- \\  
 \hline
 \end{tabular}
 \end{center}
