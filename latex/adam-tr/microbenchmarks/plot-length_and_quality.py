@@ -1,4 +1,4 @@
-from pylab import loglog, ylabel, xlabel, title, grid, savefig, show, legend
+from pylab import loglog, ylabel, xlabel, title, grid, savefig, show, legend, xticks, yticks
 
 def plot (name, t, n, bam, adam, adammin, adamavg):
 
@@ -37,6 +37,15 @@ def plot (name, t, n, bam, adam, adammin, adamavg):
     loglog (exp_n, exp_adammin, 'r--', basex=2, basey=2)
     loglog (n, adamavg_speedup, 'mD-', basex=2, basey=2, label="ADAM Avg")
     loglog (exp_n, exp_adamavg, 'm--', basex=2, basey=2)
+
+    locs,labels = xticks()
+    xn = ["", "1", "2", "4", "8", "16", ""]
+    xticks(locs, xn)
+
+    yn = ["", "", "1/2", "1", "2", "4", "8", "16", "32", "64", "128"]
+    locs,labels = yticks()
+    yticks(locs, yn)
+
     ylabel ("Speedup (Normalized to BAM)")
     xlabel ("Number of Machines")
     legend (loc=4)
@@ -44,7 +53,7 @@ def plot (name, t, n, bam, adam, adammin, adamavg):
     grid (True)
     savefig (name)
 
-n = [1, 2, 4, 8, 16, 32]
+n = [1, 2, 4, 8, 16]
 
 bam = [100306.24, 37519.54, 26141.39, 21954.62, 23908.54]
 adam = [207254.19, 90511.94, 48233.65, 27379.37, 17105.28]

@@ -655,37 +655,7 @@ us with predicate pushdown: we deserialize only the columns needed to identify w
 then process those fields; if they pass the predicate, we then deserialize the full record.
 
 We can prove that this process requires no additional reads. Intuitively this is true as the initial columns read would need to be read
-if they were to be used in the filter later. However, this can be formalized.
-
-\newtheorem{predicate-read-conserving}{Theorem}
-
-\begin{predicate-read-conserving}
-Predicate pushdown requires no additional disk accesses.
-\end{predicate-read-conserving}
-
-\begin{proof}
-
-If $R$ is the set of records to read, $Proj$ is the projection we are using, and $size(i,j)$ returns the amount
-of data recorded in column $j$ of record $i$, the total data read without predicate pushdown is:
-
-\begin{equation}
-\label{eqn:no-predicate}
-\sum_{m}^{R}{\sum_{i}^{Proj}size(m,i)}
-\end{equation}
-
-By using predicate pushdown, we reduce this total to:
-
-\begin{equation}
-\label{eqn:predicate}
-\sum_{m}^{R}{\sum_{i}^{Pred}size(m,i)} + \sum_{n}^{R_{p=True}}{\sum_{i}^{Proj \setminus Pred}size(n,i)}
-\end{equation}
-
-$Pred$ represents the set of columns used in the predicate. The set $R_{p=True}$ represents the subset of records in $R$ that pass
-the predicate function. We can show that  if no records fail the predicate~(i.e.~$R~=~R_{p=True}$), then equations \ref{eqn:no-predicate}
-and \ref{eqn:predicate} become equal. This is because by definition $Proj~=~(Pred~\cup~(Proj~\setminus~Pred))$.
-
-\end{proof}
-
+if they were to be used in the filter later. However, this can be formalized. We provide a proof for this in the appendix.
 In this section, we seek to provide an intuition for how predicate pushdown can improve the performance of actual genomics workloads.
 We apply predicate pushdown to implement read quality predication, mapping score predication, and predication by chromosome. 
 
@@ -780,7 +750,7 @@ like Spark, to create tasks which run across the entire cluster processing the r
 The NA12878 high-coverage BAM file used for these experiments can be found on the 1000 Genomes ftp site, 
 \texttt{ftp.1000genomes.ebi.ac.uk} in directory \begin{small}\texttt{/vol1/ftp/data/NA12878/high\_coverage\_alignment/}\end{small}.
 
-\subsection{Single Node Performance}
+\subsubsection{Single Node Performance}
 
 A single \texttt{hs1.8xlarge} Amazon EC2 instance was used to compare the performance of ADAM to Picard Tools 1.103.
 This \texttt{hs1.8xlarge} instance has 16 vCPU, 117 GB Memory and 24 2,048 GB HDD drives that can
@@ -796,7 +766,7 @@ processing. All single-node tests were performed on the same EC2 instance.
 
 OpenJDK 1.6.0\_24 (Sun Microsystems Inc.) was used for all single-node tests.
 
-\subsubsection{Picard Whole Genome Sorting}
+\paragraph{Picard Whole Genome Sorting:}
 \label{sec:single-sort-picard}
 
 Picard's SamSort tool was used to sort the NA12878 whole genome BAM file using the following options as output
@@ -831,7 +801,7 @@ though 64GB was available) which seems to indicate that \texttt{MAX\_RECORDS\_IN
 dropped to 5M/s reading and 8M/s writing during the last 13.25 hours when the final merging of spilled files occured.
 Picard spilled 386G of data during the sort.
 
-\subsubsection{ADAM Whole Genome Sorting}
+\paragraph{ADAM Whole Genome Sorting:}
 \label{sec:single-sort-adam}
 
 The following ADAM command was used to sort the NA12878 whole genome BAM file and save the results to the 
@@ -855,7 +825,7 @@ During the initial key sort stage, ADAM was reading the BAM at ~75M/s with about
 452.6GB of data to disk. During the final stage of saving the results to the Avro/Parquet format, all CPUs were at
 ~100\% usage and disk i/o was relatively lighter at ~25M/s. RAM usage peaked at 73GB of the 111GB available to the VM.
 
-\subsubsection{Whole Genome Mark Duplicates}
+\paragraph{Whole Genome Mark Duplicates:}
 \label{sec:single-node-whole-genome}
 
 Picard's MarkDuplicates tool was used to mark duplicates in the NA12878 whole genome BAM file.
@@ -884,7 +854,7 @@ CREATE_INDEX=false \
 CREATE_MD5_FILE=false
 \end{lstlisting}
 
-\subsubsection{Single Node Performance Summary}
+\paragraph{Single Node Performance Summary:}
 \label{sec:single-node-summary}
 
 \begin{table}[h]
@@ -902,12 +872,11 @@ MarkDuplicates & 20 h 6 m & --- \\
 \end{center}
 \end{table}
 
-\subsection{Cluster Performance}
+\subsubsection{Cluster Performance}
 
-Unlike current genomic software systems, ADAM can scale out to reduce the time
-for data analysis by distributing computation across a cluster.
+ADAM's performance can be scaled by distributing work across a cluster of machines.
 
-\subsubsection{Flagstat}
+\paragraph{Flagstat:}
 \label{sec:flagstat}
 
 Even the simplest application can benefit from the ADAM format and execution
@@ -942,8 +911,8 @@ identical information in the same text format.
 \hline
 \bf Software  & \bf Wall clock time \\
 \hline
-Samtools 0.1.19 & 25m 24s \\
-ADAM 0.5.0 & 0m 46s \\
+Samtools 0.1.19 & 25m24s \\ 
+ADAM 0.5.0 & 0m46s \\
 \hline
 \end{tabular}
 \end{center}
@@ -953,7 +922,7 @@ The ADAM \texttt{flagstat} command was run on EC2 with 32 \texttt{cr1.8xlarge} m
 which is, not suprisingly, why ADAM ran 34 times faster. While the samtools \texttt{flagstat}
 command is multi-threaded, it can only be run on a single machine.
 
-\subsubsection{Sort}
+\paragraph{Sort:}
 \label{sec:sort}
 
 When coordinate sorting a BAM file, reads are reordered by reference id and alignment start position.
@@ -974,9 +943,9 @@ are sent to the end of the file.
 \hline
 \bf Software & \bf EC2 profile & \bf Wall clock time \\
 \hline
-Picard Tools 1.103 & 1 \texttt{hs1.8xlarge} & 17h 44m \\
-ADAM 0.5.0 & 32 \texttt{cr1.8xlarge} & 33m \\
-ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 21m \\
+Picard Tools 1.102 & --- & 13h \\
+ADAM 0.5.0 & 32 \texttt{cr1.8xlarge} & 32m38s \\
+ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 20m57s \\ 
 \hline
 \end{tabular}
 \end{center}
@@ -990,9 +959,11 @@ Monitoring the Spark console during sorting revealed that the \texttt{sortByKey}
 operation (on line 10 above) took a total of 1 min 37 secs. The \texttt{map} operation
 (at line 2 above) took 1 min 48 secs, and the remainder of the time, 29 min 25 secs, was 
 spent writing the results to HDFS. There were a total of 1586 tasks with a majority
-finishing in under 10 minutes.
+finishing in under 10 minutes. A sole traggling task took 29 min 25 secs to write
+all unmapped reads. This indicates that using a custom partitioner could dramatically
+improve performance.
 
-\subsubsection{Mark Duplicates}
+\paragraph{Mark Duplicates:}
 \label{sec:mark-duplicates}
 
 The ADAM algorithm for marking duplicate is nearly identical to Picard's MarkDuplicates
@@ -1007,8 +978,8 @@ command.
 \hline
 \bf Software & \bf EC2 profile & \bf Wall clock time \\
 \hline
-Picard 1.103 & 1 \texttt{hs1.8xlarge} & 20 h 6 m \\
-ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 29m \\
+Picard 1.102 & --- & 13h \\
+ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 28m17 \\
 \hline
 \end{tabular}
 \end{center}
@@ -1026,15 +997,15 @@ Due to caching effects, we see a 20\% improvement in performance when we cascade
 \hline
 \bf Software & \bf EC2 profile & \bf Wall clock time \\
 \hline
-Picard Tools 1.103 & \texttt{hs1.8xlarge} & 37h 50m \\
-ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 51m \\
+Picard Tools 1.102 & --- & 26h \\
+ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 50m45s \\
 \hline
 \end{tabular}
 \end{center}
 \end{scriptsize}
 \end{table}
 
-\subsection{Tuning Spark on EC2}
+\subsubsection{Tuning Spark on EC2}
 
 All applications were run on Amazon EC2 with minimal tuning. The performance numbers in this report
 should not be considered best case performance numbers.
@@ -1113,6 +1084,20 @@ Spark has bindings for Scala, Java, and Python, and Parquet implementations exis
 is implemented on top of Avro, the data model can also be auto\-generated for C/C++/C\#, Python, Ruby, and php. We hope
 to make API implementations available for some of these languages at a later date.
 
+\subsection{BQSR and Indel Realignment}
+\label{sec:future-bqsr-ir}
+
+BQSR and indel realignment implementations are available in ADAM, but have not yet been fully validated for correctness
+nor has their performance been fully characterized. We anticipate this work to be complete in early 2014.
+
+\subsection{Variant and Genotype Format}
+\label{sec:variant-genotype-format-future}
+
+Although we have defined a draft variant and genotype format, we are currently working with a multi-institution team to
+refine these formats. Our aim is to clarify problems present with the current VCF spec, and to make the variant and genotype
+formats more amenable to computational analysis, curation and distribution, and clinical use. We plan to release a follow-on
+report when this format is stable.
+
 \section{Discussion}
 \label{sec:discussion}
 
@@ -1126,7 +1111,7 @@ follows:
 to support new access patterns.
 \end{itemize}
 
-In this section, we discuss a few tradeoffs inherent to ADAM, as well as new applications enabled by ADAM.
+In this section, we discuss a few tradeoffs inherent to ADAM.
 
 \subsection{Columnar vs. Row Storage}
 \label{sec:columnar-vs-row-storage}
@@ -1145,65 +1130,6 @@ row oriented storage~\footnote{It is worth noting that the Avro serialization sy
 row oriented system.}. The rest of the implementation in the system would be isolated from this change: algorithms in the
 pipeline would be implemented on top of the higher level API, and the compute substrate would interact with the data access
 layer to implement the process of reading and writing data.
-
-\subsection{New Applications Enabled\\By ADAM}
-\label{sec:new-applications}
-
-The ADAM format and environment provides a significant performance improvement over current BAM based solutions. By reducing
-processing latency, ADAM will make genomic data available for use in latency-critical applications, such as genomic driven treatment
-of acute diseases. Additionally, the genomics stack design we proposed in~\S\ref{sec:design-philosophy} unlocks new computational
-patterns that can be applied to genomic data. In this section, we introduce a few of these novel applications, discuss why they are important,
-and explain how these applications are enabled by ADAM.
-
-\subsubsection{Personalized Treatment of\\Acute Diseases}
-\label{sec:personalized-acute-diseases}
-
-There is significant interest in using genomic data as another layer of evidence for the treatment of diseases that have genetic
-causes~\cite{ghosh09, van13}. While chronic hereditary diseases like Huntington's Disease may not be sensitive to the latency of genomic
-processing pipelines, reduced latency is critical for neonatal diagnosis and for the treatment of some cancers. In acute myeloid
-leukemia~(AML), there exists a well defined set of mutations that can be used for guiding patient treatment~\cite{smith12}. However,
-due to the rapid progression of AML, treatment decisions must be made in under one week. As illustrated
-in~\S\ref{sec:genomic-processing-pipelines}, this target is not within the reach of current processing pipelines.
-
-It is worth noting that the numbers presented in~\S\ref{sec:genomic-processing-pipelines} would be optimistic in reality. To improve
-accuracy, the current state of the art in mutation calling uses very high coverage sequencing data~($\sim100-150\times$) for the
-tumor cell line, along with high coverage sequencing data~($\sim30\times$) for the normal cell line~\cite{cibulskis13}. We are
-developing a variant and mutation calling pipeline that uses the ADAM processing pipeline and the high-performance SNAP
-aligner~\cite{zaharia11} to achieve performance that will satisfy the latency requirements for use in acute disease diagnosis.
-
-\subsubsection{Viral Outbreak Monitoring}
-\label{sec:viral-outbreak-monitoring}
-
-There is significant interest in tools for the analysis of viral outbreaks in both the medical and defense epidemiology
-communities~\cite{snitkin12,beard08}. Genomic techniques can be used for identifying infection vectors in epidemics that
-feature rapidly mutating diseases, as well as for the rapid identification of unknown infectious agents in an attack using
-biological weapons. Similar to the acute genetic driven diseases discussed in \S\ref{sec:personalized-acute-diseases}, both
-of these applications are latency sensitive; the United States Department of Defense (DoD) has set a goal of developing a
-system which can identify an unknown infectious agent within one hour with the use of genomic data.
-
-In addition to providing significantly lower latency than current pipelines, there are other advantages to ADAM. Current
-approaches to tracking viral outbreaks perform a graph based analysis that uses variant data and temporal data to identify
-possible modes of disease transmission~\cite{snitkin12}. As ADAM is implemented on top of Spark, data in ADAM format
-can be processed as a graph by using the GraphX distributed graph analysis framework~\cite{xin13}.
-
-\subsubsection{Ad Hoc Genomic Analysis}
-\label{sec:ad-hoc-genomic-analysis}
-
-ADAM is implemented on top of the Spark MapReduce framework. A major contribution of the Spark framework was the introduction
-of a command line interface that allows for the real-time ad hoc analysis of data kept in memory~\cite{zaharia12}. This interactive
-framework can be coupled with the ability to perform interactive queries in Shark to allow for rapid data aggregation and analysis.
-Several applications for this approach are presented by Kozanitis et al.~\cite{kozanitis13} such as allowing direct evidence access
-to physicians who are working in a clinical setting with patients with hereditary diseases. However, GQL performance limited the
-performance of these queries to $\sim45$ minutes. We are still working on the implementation of our database
-interface~(see~\S\ref{sec:database-integration}), but expect to achieve improved performance.
-
-In addition to clinical applications, interactive data access could be applied to pathway analysis. Specifically, if a biologist has
-genetic data for organisms who demonstrate a specific phenotype, interactive data processing could be used for correlating
-lab observations with genotypes. Instead of genotyping the full genome/exome of all reference organisms, the raw reads for
-all organisms could be aligned in stored in a database. Once lab measurements and cytological observations have allowed
-the biologist to hypothesize that a specific pathway had failed, the database of raw reads could be queried for all genes of
-interest~(genes that influence the pathway under study). This would lead to a significant reduction in the amount of genomic
-data that needed to be processed, which would allow for interactive read processing and variant calling.
 
 \subsection{Programming Model\\Improvements}
 \label{sec:programming-model-improvements}
@@ -1608,6 +1534,36 @@ position are scored and all but the highest scoring read is marked a duplicate.
 If there are no pairs in a group, all fragments are scored and all but the highest scoring fragment
 are marked duplicates.
 
+\section{Predicate Pushdown Proof}
+
+\newtheorem{predicate-read-conserving}{Theorem}
+
+\begin{predicate-read-conserving}
+Predicate pushdown requires no additional disk accesses.
+\end{predicate-read-conserving}
+
+\begin{proof}
+
+If $R$ is the set of records to read, $Proj$ is the projection we are using, and $size(i,j)$ returns the amount
+of data recorded in column $j$ of record $i$, the total data read without predicate pushdown is:
+
+\begin{equation}
+\label{eqn:no-predicate}
+\sum_{m}^{R}{\sum_{i}^{Proj}size(m,i)}
+\end{equation}
+
+By using predicate pushdown, we reduce this total to:
+
+\begin{equation}
+\label{eqn:predicate}
+\sum_{m}^{R}{\sum_{i}^{Pred}size(m,i)} + \sum_{n}^{R_{p=True}}{\sum_{i}^{Proj \setminus Pred}size(n,i)}
+\end{equation}
+
+$Pred$ represents the set of columns used in the predicate. The set $R_{p=True}$ represents the subset of records in $R$ that pass
+the predicate function. We can show that  if no records fail the predicate~(i.e.~$R~=~R_{p=True}$), then equations \ref{eqn:no-predicate}
+and \ref{eqn:predicate} become equal. This is because by definition $Proj~=~(Pred~\cup~(Proj~\setminus~Pred))$.
+
+\end{proof}
 
 \bibliographystyle{acm}
 

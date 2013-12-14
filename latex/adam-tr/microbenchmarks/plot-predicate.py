@@ -1,4 +1,4 @@
-from pylab import loglog, ylabel, xlabel, title, grid, savefig, show, legend
+from pylab import loglog, ylabel, xlabel, title, grid, savefig, show, legend, xticks, yticks
 from numpy import arange
 
 def plot (name, t, n, norm, adam, adammin, adamavg):
@@ -23,6 +23,15 @@ def plot (name, t, n, norm, adam, adammin, adamavg):
     loglog (n, adam_speedup, 'g+-', basex=2, basey=2, label="ADAM")
     loglog (n, adammin_speedup, 'ro-', basex=2, basey=2, label="ADAM Min")
     loglog (n, adamavg_speedup, 'mD-', basex=2, basey=2, label="ADAM Avg")
+
+    locs,labels = xticks()
+    xn = ["", "1", "2", "4", "8"]
+    xticks(locs, xn)
+
+    locs,labels = yticks()
+    yn = ["", "1", "2", "4"]
+    yticks(locs, yn)
+
     ylabel ("Speedup (Normalized to Reading Without Predicate)")
     xlabel ("1/n")
     legend (loc=1)
