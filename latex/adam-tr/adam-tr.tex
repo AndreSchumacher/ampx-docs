@@ -904,7 +904,8 @@ MarkDuplicates & 20 h 6 m & --- \\
 
 \subsection{Cluster Performance}
 
-ADAM's performance can be scaled by distributing work across a cluster of machines.
+Unlike current genomic software systems, ADAM can scale out to reduce the time
+for data analysis by distributing computation across a cluster.
 
 \subsubsection{Flagstat}
 \label{sec:flagstat}
@@ -941,8 +942,8 @@ identical information in the same text format.
 \hline
 \bf Software  & \bf Wall clock time \\
 \hline
-Samtools 0.1.19 & 25m24s \\ 
-ADAM 0.5.0 & 0m46s \\
+Samtools 0.1.19 & 25m 24s \\
+ADAM 0.5.0 & 0m 46s \\
 \hline
 \end{tabular}
 \end{center}
@@ -973,9 +974,9 @@ are sent to the end of the file.
 \hline
 \bf Software & \bf EC2 profile & \bf Wall clock time \\
 \hline
-Picard Tools 1.102 & --- & 13h \\
-ADAM 0.5.0 & 32 \texttt{cr1.8xlarge} & 32m38s \\
-ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 20m57s \\ 
+Picard Tools 1.103 & 1 \texttt{hs1.8xlarge} & 17h 44m \\
+ADAM 0.5.0 & 32 \texttt{cr1.8xlarge} & 33m \\
+ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 21m \\
 \hline
 \end{tabular}
 \end{center}
@@ -1008,8 +1009,8 @@ command.
 \hline
 \bf Software & \bf EC2 profile & \bf Wall clock time \\
 \hline
-Picard 1.102 & --- & 13h \\
-ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 28m17 \\
+Picard 1.103 & 1 \texttt{hs1.8xlarge} & 20 h 6 m \\
+ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 29m \\
 \hline
 \end{tabular}
 \end{center}
@@ -1027,8 +1028,8 @@ Due to caching effects, we see a 20\% improvement in performance when we cascade
 \hline
 \bf Software & \bf EC2 profile & \bf Wall clock time \\
 \hline
-Picard Tools 1.102 & --- & 26h \\
-ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 50m45s \\
+Picard Tools 1.103 & \texttt{hs1.8xlarge} & 37h 50m \\
+ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 51m \\
 \hline
 \end{tabular}
 \end{center}
