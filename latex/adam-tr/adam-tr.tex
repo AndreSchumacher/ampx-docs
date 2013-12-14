@@ -990,9 +990,7 @@ Monitoring the Spark console during sorting revealed that the \texttt{sortByKey}
 operation (on line 10 above) took a total of 1 min 37 secs. The \texttt{map} operation
 (at line 2 above) took 1 min 48 secs, and the remainder of the time, 29 min 25 secs, was 
 spent writing the results to HDFS. There were a total of 1586 tasks with a majority
-finishing in under 10 minutes. A sole traggling task took 29 min 25 secs to write
-all unmapped reads. This indicates that using a custom partitioner could dramatically
-improve performance.
+finishing in under 10 minutes.
 
 \subsubsection{Mark Duplicates}
 \label{sec:mark-duplicates}
