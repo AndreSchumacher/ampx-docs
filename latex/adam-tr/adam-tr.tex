@@ -415,16 +415,24 @@ analyze the performance of our system and the impact of our design philosophy.
 
 ADAM contains formats for storing read and reference oriented sequence information, and variant/genotype data.
 The read oriented sequence format is forwards and backwards compatible with BAM/SAM, and the variant/genotype
-data is forwards and backwards compatible with VCF. In this section, we discuss the frameworks used to store this
-data. We then introduce the representations, and discuss the content of each representation.
+data is forwards and backwards compatible with VCF. We provide two APIs:
 
-We describe the data representation for the ADAM format using the open source Apache Avro data serialization
+\begin{enumerate}
+\item A data format/access API implemented on top of Apache Avro and Parquet
+\item A data transformation API implemented on top of Apache Spark
+\end{enumerate}
+
+In this section, we provide brief introductions to these two APIs. We then introduce the data representations, discuss the content
+of each representation, and introduce the transforms that we provide for each representation.
+
+The data representation for the ADAM format is described using the open source Apache Avro data serialization
 system~\cite{avro}. The Avro system also provides a human readable schema description language that can
-auto-generate the schema implementation in several common languages including  C/C++/C\#, Java/Scala, php,
+auto-generate the schema implementation in several common languages including C/C++/C\#, Java/Scala, php,
 Python, and Ruby. This flexibility provides a significant cross-compatibility advantage over the BAM/SAM format,
 where the data format has only been implemented for C/C++ through Samtools and for Java through
-Picard~\cite{li09,picard}. To complicate matters, in BAM/SAM there are well known incompatibilities between these APIs implemented in different languages,
-as well as APIs for accessing variant data~(discussed in~\S\ref{sec:variant-and-genotype-storage}).
+Picard~\cite{li09,picard}. To complicate matters, in BAM/SAM there are well known incompatibilities between these
+APIs implemented in different languages. This problem persists across APIs for accessing variant data~(discussed
+in~\S\ref{sec:variant-and-genotype-storage}).
 
 We layer this data format inside of the Parquet column store~\cite{parquet}. Parquet is an open source columnar storage
 format that was designed by Cloudera and Twitter. It can be used as a single flat file, a distributed file, or as a database inside of Hive, Shark, or Impala. Columnar stores like Parquet provide several significant advantages when storing genomic data:
@@ -461,10 +469,18 @@ groups of reads.
 \label{fig:file-format}
 \end{figure}
 
-The internal data types presented in this section make up the narrow waist of our
-proposed genomics stack in Figure \ref{fig:stack-model}, as discussed in the prior section. In~\S\ref{sec:database-integration} and~\S\ref{sec:columnar-vs-row-storage}, we review how this
+The internal data types presented in this section make up the narrow waist of our proposed genomics stack in Figure \ref{fig:stack-model},
+as discussed in the prior section. In~\S\ref{sec:database-integration} and~\S\ref{sec:columnar-vs-row-storage}, we review how this
 abstraction allows us to support different data access frameworks and storage techniques to tailor the stack for the needs of
 a specific application.
+
+For application developers who are using Apache Spark, we provide an additional API. This API consists of transform steps for RDDs~(see
+Zaharia et al~\cite{zaharia12} for a discussion of RDDs) containing genomic data, and several enriched types. These transform steps provide
+several frequently used processing stages, like sorting genomic data, deduplicating reads, or transforming reads into pileups. By implementing
+these transformations on top of RDDs, we allow for efficient, distributed in-memory processing and achieve significant speedups. In this section,
+we describe the transformations that we provide per each datatype. In section~\S\ref{sec:applications}, we discuss the performance
+characteristics of sorting and duplicate marking. Detailed descriptions of several of the algorithms that underly these transformations are provided
+in appendix~\ref{sec:algorithm-implentations}.
 
 \subsection{Read Oriented Storage}
 \label{sec:read-oriented-storage}
@@ -526,7 +542,22 @@ Read Group & Sequencing Center & String \\
 \end{table}
 
 This format is used to store all data on disk. In addition to this format, we provide an enhanced API for accessing read
-data.
+data, and several transformations. This enhanced API converts several string fields into native objects (e.g. CIGAR, mismatching
+positions, base quality scores), and provides several additional convenience methods. We supply several transformations for 
+RDD data:
+
+\begin{itemize}
+\item {\bf Sort:} Sorts reads by reference position
+\item {\bf Mark Duplicates:} Marks duplicate reads
+\item {\bf Base Quality Score Recalibration:} Normalizes the distribution of base quality scores
+\item {\bf Realign Indels:} Locally realigns indels that have been misaligned during global alignment
+\item {\bf Read To Reference:} Transforms data to be reference oriented~(creates pileups)
+\item {\bf Flag Stat:} Computes statistics about the boolean flags across records
+\item {\bf Create Sequence Dictionary:} Creates a dictionary summarizing data across multiple samples
+\end{itemize}
+
+The performance of sort and mark duplicates are discussed in~\S\ref{sec:applications}. The implementations of sort, mark duplicates,
+BQSR, and indel realignment are discussed in appendix~\ref{sec:algorithm-implentations}.
 
 \subsection{Reference Oriented Storage}
 \label{sec:reference-oriented-storage}
@@ -579,12 +610,11 @@ to the length of the insert. We step through the insert from the start of the re
 range offset at each position.
 
 As noted earlier, this datatype supports an operation similar to the GATK's ReducedRead datatype. We refer to these datatypes
-as aggregated pileups. 
-
-We perform aggregation by grouping together all bases that share a common reference position and
+as aggregated pileups. The aggregation transformation is done by grouping together all bases that share a common reference position and
 read base. Within an insert, we group further by the position in the insert. Once the bases have been grouped together, we average
 the base and mapping quality scores. We also count the number of soft clipped bases that show up at this location, and the amount
-of bases that are mapped to the reverse strand.
+of bases that are mapped to the reverse strand. In our RDD API, we provide an additional ADAMRod datatype which represents
+pileup ``rods,'' which are pileup bases grouped by reference position.
 
 \subsection{Variant and Genotype Storage}
 \label{sec:variant-and-genotype-storage}
@@ -725,9 +755,10 @@ the pain points.
 
 An additional benefit of the new Variant and Genotype schemas is that they have been designed to ensure that all Variant call information
 can be reconstructed using the called sample genotypes. This functionality is important for genomics projects where many samples are being
-sequenced and called together, but where different views of the sample population are wished to be provided to different scientists. In this situation,
-the total call set would be filtered for a subset of samples. From these collected genotypes, we would then recompute the variant calls and variant
-call statistics, which would then be provided as an output.
+sequenced and called together, but where different views of the sample population are wished to be provided to different scientists. In this
+situation, the total call set would be filtered for a subset of samples. From these collected genotypes, we would then recompute the variant
+calls and variant call statistics, which would then be provided as an output. This transformation is provided by our RDD-based API. Additionally,
+we provide an ADAMVariantContext datatype, which aggregates variant, genotype, and annotation data at a single genomic locus.
 
 \section{In-Memory Programming\\Model}
 \label{sec:in-memory-programming-model}
@@ -797,8 +828,6 @@ the results of this benchmark. Ideal speedup curves are plotted along with the s
 \caption{Read Length and Quality Speedup for HG00096}
 \label{fig:length-quality}
 \end{figure}
-
-
 
 This benchmark demonstrates several things:
 
@@ -1036,7 +1065,6 @@ ADAM essentially doubles performance over BAM on a single node, although cluster
 \bf Application & \bf Runtime & \bf ADAM Runtime \\
 \hline
 SamSort & 17 h 44 m & 8 h 56 m \\
-MarkDuplicates & 20 h 6 m & TBD \\  
 \hline
 \end{tabular}
 \end{center}
@@ -1149,25 +1177,6 @@ command.
 \hline
 Picard 1.103 & 1 \texttt{hs1.8xlarge} & 20 h 6 m \\
 ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 29m \\
-\hline
-\end{tabular}
-\end{center}
-\end{scriptsize}
-\end{table}
-
-Due to caching effects, we see a 20\% improvement in performance when we cascade Sort and Mark Duplicates together.
-
-\begin{table}[h]
-\caption{Sort and Mark Duplicates for NA12878}
-\label{tab:time-mark-duplicates-sort}
-\begin{scriptsize}
-\begin{center}
-\begin{tabular}{| l | c | c |}
-\hline
-\bf Software & \bf EC2 profile & \bf Wall clock time \\
-\hline
-Picard Tools 1.103 & \texttt{hs1.8xlarge} & 37h 50m \\
-ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 51m \\
 \hline
 \end{tabular}
 \end{center}
