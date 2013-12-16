@@ -189,7 +189,7 @@ Table \ref{table:overview} previews the performance of ADAM for sort and duplica
 \begin{table}[h]
 \label{table:overview}
 \small
-\caption{Sort, Duplicate Marking, and Sort + Duplicate Marking for NA12878}
+\caption{Sort and Duplicate Marking for NA12878}
 \begin{center}
 \begin{tabular}{| l | c | c |}
 \hline
@@ -211,15 +211,15 @@ Picard 1.103 & 1 \texttt{hs1.8xlarge} & 20h 22m \\
 ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 29m \\
 \hline
 \end{tabular}
-\begin{tabular}{| l | c | c |}
-\hline
-\bf Software & \bf EC2 profile & \bf Wall Clock Time \\
-\hline
-\hline
-Picard 1.103 & 1 \texttt{hs1.8xlarge} & 37h 50m \\
-ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 51m \\
-\hline
-\end{tabular}
+% \begin{tabular}{| l | c | c |}
+% \hline
+% \bf Software & \bf EC2 profile & \bf Wall Clock Time \\
+% \hline
+% \hline
+% Picard 1.103 & 1 \texttt{hs1.8xlarge} & 37h 50m \\
+% ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 51m \\
+%  \hline
+% \end{tabular}
 \end{center}
 \end{table}
 
@@ -358,20 +358,20 @@ become the modern internet. Figure~\ref{fig:stack-model} presents a similar deco
 \label{fig:stack-model}
 \end{figure}
 
-The seven levels of our stack model are decomposed as follows, from bottom to top:
+The seven layers of our stack model are decomposed as follows, traditionally numbered from bottom to top:
 
-\begin{benumerate} {7}
+\begin{enumerate}
 \item {\bf Physical Storage:} This layer coordinates data writes to physical media, usually magnetic disk.
 \item {\bf Data Distribution:} This layer manages access, replication, and distribution of the genomics files that have been written to disk.
 \item {\bf Materialized Data:} This layer encodes the patterns for how data is encoded and stored. This provides read/write efficiency
 and compression.
-\item {\bf Data Schema:} This level specifies the representation of data when it is accessed, and forms the narrow waist of the pipeline.
+\item {\bf Data Schema:} This layer specifies the representation of data when it is accessed, and forms the narrow waist of the pipeline.
 \item {\bf Evidence Access:} This layer implements efficient methods for performing common access patterns such as random database
 queries, or sequentially reading records from a flat file.
 \item {\bf Presentation:} The presentation layer provides the application developer with efficient and
 straightforward methods for querying the characteristics of individual portions of genetic data.
 \item {\bf Application:} Applications like variant calling and alignment are implemented in this layer.
-\end{benumerate}
+\end{enumerate}
 
 A well defined software stack has several significant advantages. By limiting application interactions with layers lower than the API,
 application developers are given a clear and consistent view of the data they are processing. By divorcing the API from the data
@@ -629,7 +629,8 @@ its \textsc{Info} and \textsc{Format} fields within the file header. Potentially
 
 Maintaining support
 for these catch-all fields by incorporating the file schema within an ADAM-VCF Record violates the layer separation that is a part of the design
-goals: the Evidence Access layer (layer 3 in Figure \ref{fig:stack-model}) would take on the role of reading format information from a record, and using that to parse the contents of an
+goals: the Evidence Access layer (layer 5
+in Figure \ref{fig:stack-model}) would take on the role of reading format information from a record, and using that to parse the contents of an
 information blob. Furthermore, the format information is ``hidden'' from the Schema layer (layer 4 in Figure \ref{fig:stack-model}): the system cannot know what information the record
 should contain until it looks at the format information for the record. This approach presents challenges to
  \begin{itemize}
@@ -1288,7 +1289,7 @@ follows:
 \begin{itemize}
 \item ADAM achieves approximately a $30\times$ to $50\times$ speedup when compared to other modern processing pipelines.
 \item ADAM can successfully scale to clusters larger than 100 nodes.
-\item ADAM presents an explicit data schema which makes it straightforward for the data access layer (layer 5 in Figure \ref{fig:stack-model}) to be changed
+\item ADAM presents an explicit data schema which makes it straightforward for the data access layer (layer 3 in Figure \ref{fig:stack-model}) to be changed
 to support new access patterns.
 \end{itemize}
 
@@ -1307,7 +1308,7 @@ Genomics pipelines tend to skew in favor of reading data~---~pipelines tend to r
 perform an analysis, and then write out a significantly smaller file that contains the results of the analysis.
 
 It is conceivable, however, that emerging workloads could change to be write heavy. We note that although our current
-implementation would not be optimized for these workloads, the layered model proposed in~\S\ref{sec:design-philosophy}
+implementation would not be optimized for these workloads, the layered model proposed in Figure \ref{fig:stack-model}
 allows us to easily change our implementation. Specifically, we can swap out columnar storage in the data access layer with
 row oriented storage~\footnote{It is worth noting that the Avro serialization system that we use to define ADAM is a performant
 row oriented system.}. The rest of the implementation in the system would be isolated from this change: algorithms in the
@@ -1324,7 +1325,7 @@ Additionally, the use of Scala, which is an object functional statically typed l
 provides further gains.
 
 Additional gains come from our data model. We expose a clear schema, and build an API that expands upon this schema
-to implement commonly needed functions. This API represents level 2 in the stack we proposed in Figure \ref{fig:stack-model}). To reduce the cost of this API, we make any additional transformations from our
+to implement commonly needed functions. This API represents layer 6 in the stack we proposed in Figure \ref{fig:stack-model}). To reduce the cost of this API, we make any additional transformations from our
 internal schema to the data types presented in our API lazy. This transformation eliminates the cost of providing these functions if they are
 not used. Additionally, if an additional transformation is required, we only pay the cost the first time the transformation is performed.
 
