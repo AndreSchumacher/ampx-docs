@@ -1,0 +1,257 @@
+% THIS IS SIGPROC-SP.TEX - VERSION 3.1
+% WORKS WITH V3.2SP OF ACM_PROC_ARTICLE-SP.CLS
+% APRIL 2009
+%
+% It is an example file showing how to use the 'acm_proc_article-sp.cls' V3.2SP
+% LaTeX2e document class file for Conference Proceedings submissions.
+% ----------------------------------------------------------------------------------------------------------------
+% This .tex file (and associated .cls V3.2SP) *DOES NOT* produce:
+%       1) The Permission Statement
+%       2) The Conference (location) Info information
+%       3) The Copyright Line with ACM data
+%       4) Page numbering
+% ---------------------------------------------------------------------------------------------------------------
+% It is an example which *does* use the .bib file (from which the .bbl file
+% is produced).
+% REMEMBER HOWEVER: After having produced the .bbl file,
+% and prior to final submission,
+% you need to 'insert'  your .bbl file into your source .tex file so as to provide
+% ONE 'self-contained' source file.
+%
+% Questions regarding SIGS should be sent to
+% Adrienne Griscti ---> griscti@acm.org
+%
+% Questions/suggestions regarding the guidelines, .tex and .cls files, etc. to
+% Gerald Murray ---> murray@hq.acm.org
+%
+% For tracking purposes - this is V3.1SP - APRIL 2009
+
+\documentclass{acm_proc_article-sp}
+
+\usepackage{url}
+\usepackage{hyperref}
+
+\begin{document}
+
+\title{avocado: A Variant Caller, Distributed}
+%
+% You need the command \numberofauthors to handle the 'placement
+% and alignment' of the authors beneath the title.
+%
+% For aesthetic reasons, we recommend 'three authors at a time'
+% i.e. three 'name/affiliation blocks' be placed beneath the title.
+%
+% NOTE: You are NOT restricted in how many 'rows' of
+% "name/affiliations" may appear. We just ask that you restrict
+% the number of 'columns' to three.
+%
+% Because of the available 'opening page real-estate'
+% we ask you to refrain from putting more than six authors
+% (two rows with three columns) beneath the article title.
+% More than six makes the first-page appear very cluttered indeed.
+%
+% Use the \alignauthor commands to handle the names
+% and affiliations for an 'aesthetic maximum' of six authors.
+% Add names, affiliations, addresses for
+% the seventh etc. author(s) as the argument for the
+% \additionalauthors command.
+% These 'additional authors' will be output/set for you
+% without further effort on your part as the last section in
+% the body of your article BEFORE References or any Appendices.
+
+\numberofauthors{1} %  in this sample file, there are a *total*
+% of EIGHT authors. SIX appear on the 'first-page' (for formatting
+% reasons) and the remaining two appear in the \additionalauthors section.
+%
+\author{
+% You can go ahead and credit any number of authors here,
+% e.g. one 'row of three' or two rows (consisting of one row of three
+% and a second row of one, two or three).
+%
+% The command \alignauthor (no curly braces needed) should
+% precede each author name, affiliation/snail-mail address and
+% e-mail address. Additionally, tag each line of
+% affiliation/address with \affaddr, and tag the
+% e-mail address with \email.
+%
+% 1st. author
+\alignauthor
+Frank~Austin~Nothaft, Peter~Jin, Brielin~Brown\\
+       \affaddr{Department of Electrical Engineering and Computer Science}\\
+       \affaddr{University of California, Berkeley}\\
+       \email{\{fnothaft,phj,brielin\}@berkeley.edu}
+}
+
+\maketitle
+
+\begin{abstract}
+In this paper, we present \texttt{avocado}, a distributed variant caller built on top of ADAM and Spark. \texttt{avocado}'s goal is to provide
+both high performance and high accuracy in an open source variant calling framework. To achieve this, we implement both local assembly
+and pileup-based single nucleotide polymorphism~(SNP) calling. A key innovation presented in our work involves the development of
+heuristics for when to choose more expensive assembly-based methods instead of pileup-based methods. Additionally, we introduce the
+concept of ``significant statistics,'' a tool for performing incremental joint variant calling.
+\end{abstract}
+
+% A category with the (minimum) three required fields
+\category{Applied Computing}{Life and Medical Sciences}{Computational Biology}[Sequencing and Genotyping Technologies]
+\category{Applied Computing}{Genomics}{Computational Genomics}
+\category{Computing Methodologies}{Distributed Computing Methodologies}{Distributed Algorithms}[MapReduce Algorithms]
+
+\terms{Algorithms, Performance}
+
+\keywords{Variant Calling, Genotyping, Genomics Pipeline, Local Assembly, Distributed Computing, MapReduce} 
+
+\section{Introduction}
+\label{sec:intro}
+
+Modern genomics processing pipelines can be divided into four primary ordered stages:
+
+\begin{enumerate}
+\item \textbf{Sequencing:} Gathering of read data from DNA
+\item \textbf{Alignment:} Alignment of read data against reference genome
+\item \textbf{Variant Calling:} Statistical determination of differences against reference genome
+\item \textbf{Variant Annotation:} Annotation of impact of variation
+\end{enumerate}
+
+Currently, to run a genomics pipeline end-to-end for a single high coverage genome\footnote{High coverage refers to having on average
+$>$30$\times$ bases aligned to each location in the reference genome.} consumes approximately 100 hours~\cite{talwalkar13}. Of this
+100 hour figure, both alignment and variant calling consume approximately 50 hours each.
+
+Although some applications that use genomic data are latency insensitive~(for example, population genomics), many medical applications
+like genomic medicine, or genomic classification of viral outbreaks~\cite{snitkin12} are latency sensitive. However, it is unacceptable to
+sacrifice accuracy in the pursuit of speed. Recent work has focused on the problem of accelerating alignment~\cite{zaharia11}; in this paper,
+we address accelerating variant calling.
+
+As noted above, it is unacceptable to sacrifice accuracy for performance. To achieve improved performance, we implement several
+enhancements:
+
+\begin{itemize}
+\item Current pipelines are penalized by I/O performance, we address this by using an in-memory MapReduce framework~\cite{zaharia10}
+to reduce I/O pressure
+\item Additionally, we leverage the new ADAM data format~\cite{massie13}, a high performance file format for distributed genomics
+\item Finally, we achieve high accuracy at a low performance cost by using high fidelity assembly-based methods only on complex
+segments of the genome
+\end{itemize}
+
+In this paper, we discuss this system, related work, and perform a performance analysis. We start with a discussion of the related work
+in~\S\ref{sec:related-work}. We then describe our architecture and algorithms in~\S\ref{sec:architecture}. Finally, we analyze the performance
+of our system in~\S\ref{sec:evaluation}, and propose future research directions in~\S\ref{sec:future-work}.
+
+\section{Related Work}
+\label{sec:related-work}
+
+There has been significant work related to variant calling, and towards accelerating the genomic processing pipeline. In this section, we
+discuss other variant calling pipelines, and tools that we use in our evaluation.
+
+\subsection{ADAM}
+\label{sec:adam}
+
+% Frank 0.33pg
+
+ADAM~\cite{massie13} is a new data format for genomics meant to replace the Sequence/Binary Alignment/Map~(SAM/BAM) formats for read
+data~\cite{li09}, and the Variant Call Format~(VCF) for variant/genotype data~\cite{danecek11}. The original SAM/BAM/VCF formats were
+designed for single-node processing, and do not easily distribute across several machines. Although a library was designed for processing
+BAM/VCF data in Hadoop~\cite{niemenmaa12}, this API does not scale well past 8 nodes. ADAM achieves scalability beyond 100 machines
+by eliminating the central file header, and by using the Parquet data store which is optimized for parallel data access~\cite{parquet}.
+
+In the process of developing \texttt{avocado}, we contributed 2,500 lines of code~(LOC) to the ADAM project. This contribution comprised
+the variant and genotype format, code for calculating normalized variant data from genotypes, and converters to/from the VCF format.
+
+\subsection{The Genome Analysis Toolkit}
+\label{sec:gatk}
+
+% Peter 0.33pg
+
+\cite{mckenna10, depristo11}
+
+\subsection{Samtools Mpileup}
+\label{sec:samtools}
+
+% Brielin 0.33pg
+
+\cite{li11}
+
+\subsection{FreeBayes}
+\label{sec:freebayes}
+
+% Frank 0.33pg
+\cite{garrison12}
+
+\subsection{SNAP}
+\label{sec:snap}
+
+% Frank 0.33pg
+
+\subsection{SMaSH}
+\label{sec:smash}
+
+% Frank 0.33pg
+
+\section{Architecture}
+\label{sec:architecture}
+
+% Frank 1pg
+
+\subsection{Local Assembly}
+\label{sec:local-assembly}
+
+% Peter 1pg
+
+\subsection{SNP Calling}
+\label{sec:snp-calling}
+
+% Brielin .5pg
+
+\subsection{Joint Variant Calling}
+\label{sec:joint-variant-calling}
+
+% Brielin .5pg
+
+\subsection{Algorithm Selection}
+\label{sec:algorithm-selection}
+
+% Frank .5pg
+
+\section{Evaluation}
+\label{sec:evaluation}
+
+% Frank 0.5pg
+
+\subsection{Accuracy}
+\label{sec:accuracy}
+
+% Frank 1pg
+
+\subsection{Performance}
+\label{sec:performance}
+
+% Frank 1pg
+
+\section{Future Work}
+\label{sec:future-work}
+
+% Frank 1pg
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+\appendix
+
+\section{Availability}
+
+\texttt{avocado} is open source and is licensed under the Apache 2 license. The source code is available at:
+
+\url{http://www.github.com/bigdatagenomics/avocado}
+
+% Frank 0.33pg
+
+%
+% The following two commands are all you need in the
+% initial runs of your .tex file to
+% produce the bibliography for the citations in your paper.
+\bibliographystyle{abbrv}
+\bibliography{avocado-cs262-report}  
+
+\balancecolumns
+% That's all folks!
+\end{document}
