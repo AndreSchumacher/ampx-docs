@@ -197,6 +197,55 @@ the variant and genotype format, code for calculating normalized variant data fr
 
 % Peter 1pg
 
+
+
+From the assembled haplotypes, we order them according to the haplotype
+likelihood:
+\begin{align}
+  \mathcal L(H_j)
+  &\equiv\mathbf P(\{r_i\}|H_j) \\
+  &=\prod_i\mathbf P(r_i|H_j)
+\end{align}
+where $\mathbf P(r_i|H_j)$ is obtained from aligning the read and the
+candidate haplotype by a pairwise HMM alignment.
+Among the ordered haplotypes, we pick the top scoring haplotypes and ignore
+the low scoring ones.
+The likelihood of observing the reads $\{r_i\}$, given a pair of haplotypes
+$H_j$ and $H_{j'}$, is defined to be: % cite dindel
+\begin{align}
+  \mathcal L(H_j,H_{j'})
+  &\equiv\mathbf P(\{r_i\}|H_j,H_{j'}) \\
+  &=\prod_i\left[ \frac{\mathbf P(r_i|H_j) }{2} + \frac{\mathbf P(r_i|H_{j'})}{2} \right].
+\end{align}
+We compute the posterior probability of observing the pair of haplotypes
+$H_j$ and $H_{j'}$ from the haplotype pair likelihood and a haplotype pair
+prior probability:
+\begin{align}
+  \mathbf P (H_j,H_{j'}|\{r_i\})&=\frac{1}{Z}\mathcal L(H_j,H_{j'})\mathbf P(H_j,H_{j'})
+\end{align}
+where $Z$ is a normalization:
+\begin{align*}
+  Z&=\sum_j\sum_{j'}\mathcal L(H_j,H_{j'})\mathbf P(H_j,H_{j'})
+\end{align*}
+and where we obtain the prior $\mathbf P (H_j,H_{j'})$ by aligning the haplotype
+pair with the same pairwise HMM alignment as above, and taking the product of
+the prior probabilities for each SNP and indel event. % cite dindel and durbin
+
+We choose the maximum a priori estimate among haplotypes with any variants
+as the called non-reference maternal and paternal haplotype pair:
+\begin{align}
+  (H_\text{mat}^\text{nonref},H_\text{pat}^\text{nonref})&=\arg\max_{H_j,H_{j'}:n_\text{var}(H_j,H_{j'})>0}\mathbf P(H_j,H_{j'}|\{r_i\}).
+\end{align}
+Similarly, we may define the reference haplotype pair as
+$(H_\text{mat}^\text{ref},H_\text{pat}^\text{ref})$.
+The error probability of calling the non-reference haplotype pair is:
+\begin{align}
+  &\mathbf P_\text{error}(H_\text{mat}^\text{nonref},H_\text{pat}^\text{nonref}) \\\nonumber
+  &=\frac{\mathbf P(H_\text{mat}^\text{ref},H_\text{pat}^\text{ref})}{\mathbf P(H_\text{mat}^\text{nonref},H_\text{pat}^\text{nonref})+\mathbf P(H_\text{mat}^\text{ref},H_\text{pat}^\text{ref})}.
+\end{align}
+The quality score of all variants present in the nonreference haplotype pair
+is defined as the Phred scaling of $\mathbf P_\text{error}$.
+
 \subsection{SNP Calling}
 \label{sec:snp-calling}
 
