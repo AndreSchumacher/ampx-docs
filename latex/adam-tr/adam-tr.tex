@@ -184,8 +184,7 @@ coverage BAM file\footnote{A 250GB BAM file at 30$\times$ coverage. See~\S\ref{s
 Byrewriting these applications to make use of modern in-memory MapReduce frameworks like Apache Spark~\cite{zaharia10}, these
 transformations can now be completed in under two hours. Sorting and duplicate mapping alone can be accelerated from 1.5 days on a single node to take less than one hour on a commodity cluster. 
 
-Table \ref{table:overview} previews the performance of ADAM for sort,  duplicate marking, and sort plus duplicate marking. Note that due to the reliance of main memory instead of disk between stages, ADAM gets an additional 20\% speedup---from 60 minutes to 51 minutes---when sorting and duplicate marking are cascaded together.  
-
+Table \ref{table:overview} previews the performance of ADAM for sort and duplicate marking.
 
 \begin{table}[h]
 \label{table:overview}
