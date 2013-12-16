@@ -1387,11 +1387,23 @@ and loading of data and by providing simple and performant programming abstracti
 \label{sec:availability}
 
 The ADAM source code is available at Github at \url{http://www.github.com/bigdatagenomics/adam}, and the ADAM project website
-is at \url{http://adam.cs.berkeley.edu}. Additionally, ADAM is deployed through Maven with the following dependency:
+is at \url{http://adam.cs.berkeley.edu}. Additionally, ADAM is deployed through Maven with the following dependencies:
 
+\begin{scriptsize}
 \begin{verbatim}
-TBD
+<dependency>
+  <groupId>edu.berkeley.cs.amplab.adam</groupId>
+  <artifactId>adam-format</artifactId>
+  <version>0.5.0-SNAPSHOT</version>
+</dependency>
+
+<dependency>
+  <groupId>edu.berkeley.cs.amplab.adam</groupId>
+  <artifactId>adam-commands</artifactId>
+  <version>0.5.0-SNAPSHOT</version>
+</dependency>
 \end{verbatim}
+\end{scriptsize}
 
 At publication time, the current version of ADAM is 0.5.0. ADAM is open source and is released under the Apache 2
 license.
