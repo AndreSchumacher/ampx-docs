@@ -162,9 +162,10 @@ Additionally, this contribution included code for translating between read and r
 \subsection{The Genome Analysis Toolkit}
 \label{sec:gatk}
 
-% Peter 0.33pg
+The Genome Analysis Toolkit (GATK) \cite{mckenna10, depristo11}
+is a variant calling framework released by the Broad Institute of Harvard and MIT.
 
-\cite{mckenna10, depristo11}
+% TODO(peter, 12/17) Peter 0.33pg
 
 \subsection{Samtools Mpileup}
 \label{sec:samtools}
@@ -305,7 +306,7 @@ given the reference haplotype:
   &=\prod_i\mathbf P(r_i|H^\text{ref})
 \end{align}
 where $\mathbf P(r|H)$ is obtained from aligning the read and the
-candidate haplotype by a pairwise HMM alignment.
+candidate haplotype by a pairwise HMM alignment \cite{durbin98}.
 Note that, in practice, all probabilities are computed in units of logarithm
 base $10$, so products become sums, etc.
 
@@ -341,24 +342,6 @@ The traversal begins at a graph source, and a completed path must also end at a
 sink.
 Each path is an assembled haplotype to be evaluated.
 
-% TODO(peter, 12/16) put this in future work?
-Since assembly depends on the exact sequences of the input data, the quality of
-the reads is critical for performing an accurate assembly.
-One error correction method is spectral filtering, which depends on the
-observation that the distribution of $k$-mers from all reads with respect to
-multiplicity is bimodal, one due to the Poisson sampling of reads (with high
-multiplicity), the other due to errors (with low multiplicity), so that splitting
-the reads between the two modes and keeping the reads near the mode with higher
-multiplicity serves to prune the poor quality reads. % todo cite original assembly paper
-Errors in the read data lead to \emph{spurs}, which are spurious short sections
-of the graph connected to the source or the sink.
-We do not remove spurs, although it may slightly improve performance.
-Empirically, we have found during other work that utilizing mate pair
-information greatly improves the quality of an assembly. % todo how to cite this?
-We also do not employ mate pair threading, which requires collecting the
-insert size distribution of the data, but we expect that implementing it has
-the potential to vastly improve the accuracy of variant calls.
-
 From the assembled haplotypes, we order them according to the haplotype
 likelihood:
 \begin{align}
@@ -368,7 +351,7 @@ likelihood:
 Among the ordered haplotypes, we pick the top scoring haplotypes and ignore
 the low scoring ones.
 The likelihood of observing the reads $\{r_i\}$, given a pair of haplotypes
-$H_j$ and $H_{j'}$, is defined to be: % cite dindel
+$H_j$ and $H_{j'}$, is defined to be \cite{albers11}:
 \begin{align}
   \mathcal L(H_j,H_{j'})
   &\equiv\mathbf P(\{r_i\}|H_j,H_{j'}) \\ \nonumber
@@ -386,7 +369,8 @@ where $Z$ is a normalization:
 \end{align*}
 and where we obtain the prior $\mathbf P (H_j,H_{j'})$ by aligning the haplotype
 pair with the same pairwise HMM alignment as above, and taking the product of
-the prior probabilities for each SNP and indel event. % cite dindel and durbin
+the prior probabilities for each SNP and indel event
+\cite{albers11}.
 
 We choose the maximum a priori estimate among haplotypes with any variants
 as the called non-reference maternal and paternal haplotype pair:
@@ -509,6 +493,23 @@ equivalent to a probability of $P=0.999999$ that the read is correctly mapped.},
 \label{sec:future-work}
 
 % Frank 1pg
+
+Since assembly depends on the exact sequences of the input data, the quality of
+the reads is critical for performing an accurate assembly.
+One error correction method is spectral filtering, which depends on the
+observation that the distribution of $k$-mers from all reads with respect to
+multiplicity is bimodal, one due to the Poisson sampling of reads (with high
+multiplicity), the other due to errors (with low multiplicity), so that splitting
+the reads between the two modes and keeping the reads near the mode with higher
+multiplicity serves to prune the poor quality reads. % todo cite original assembly paper
+Errors in the read data lead to \emph{spurs}, which are spurious short sections
+of the graph connected to the source or the sink.
+We do not remove spurs, although it may slightly improve performance.
+Empirically, we have found during other work that utilizing mate pair
+information greatly improves the quality of an assembly. % todo how to cite this?
+We also do not employ mate pair threading, which requires collecting the
+insert size distribution of the data, but we expect that implementing it has
+the potential to vastly improve the accuracy of variant calls.
 
 \section{Conclusion}
 \label{sec:conclusion}
