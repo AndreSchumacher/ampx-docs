@@ -159,18 +159,10 @@ In the process of developing \texttt{avocado}, we contributed 3,500 lines of cod
 the variant and genotype format, code for calculating normalized variant data from genotypes, and converters to/from the VCF format.
 Additionally, this contribution included code for translating between read and reference oriented views of data.
 
-\subsection{The Genome Analysis Toolkit}
-\label{sec:gatk}
-
-The Genome Analysis Toolkit (GATK) \cite{mckenna10, depristo11}
-is a variant calling framework released by the Broad Institute of Harvard and MIT.
-
-% TODO(peter, 12/17) Peter 0.33pg
-
 \subsection{Samtools Mpileup}
 \label{sec:samtools}
 
-Samtools Mpileup is a tool for Single Nucleotide Polymorphism (SNP) calling and genotyping aligned read data.  Given a set of
+Samtools Mpileup is a tool for single nucleotide polymorphism (SNP) calling and genotyping aligned read data.  Given a set of
 reads from several individuals aligned to reference chromosomal position (a \emph{pileup}), Mpileup determines
 \begin{itemize}
 \item Is there statistically significant evidence that some individuals in the population have a non-reference allele at this position? (SNP calling)
@@ -180,6 +172,32 @@ for the non-reference base? (genotyping)
 Since reads from a single individual will contain sequencing errors that do not represent true genetic variation, samtools leverages
 the alignment and read quality from several individuals, and calls a site an variant if  the probability that all individuals in the sample
 are homozygous to the reference is small enough~\cite{li11}.
+
+\subsection{GATK}
+\label{sec:gatk}
+
+% TODO(peter, 12/17) Peter 0.33pg
+
+The Genome Analysis Toolkit (GATK) \cite{mckenna10, depristo11}
+is a variant calling framework released by the Broad Institute of Harvard and MIT.
+GATK was designed for multi sample calling of SNPs and short insertions and deletions,
+as well as genotyping, for human genomes,
+and appropriately it can use existing knowledge of human genetic variants
+from repositories like dbSNP \cite{sherry01} or HapMap \cite{hapmap}.
+Originally, GATK used a purely statistical model for genotyping, along similar
+lines as Mpileup, although it has since moved to performing local assembly to
+resolve haplotypes.
+Architecturally, GATK consists of a parallelizable pipeline for transforming
+short read data into VCF output, where pipeline stages are generically called
+``walkers'' and are invoked on the read data in a MapReduce style.
+
+In practice, the performance of GATK suffers due to a combination of architectural
+and engineering deficiencies.
+Actual parallelism among GATK walkers is limited.
+There are significant overheads due to disk I/O between pipeline stages and due
+to poor algorithm or data structure design.
+Nonetheless, at the time we were developing \texttt{avocado}, GATK remained the
+state of the art in variant calling human data.
 
 \subsection{FreeBayes}
 \label{sec:freebayes}
@@ -313,18 +331,20 @@ base $10$, so products become sums, etc.
 If a reference haplotype likelihood is below a fixed threshold,
 the region corresponding to the haplotype is marked \emph{active}.
 Each \emph{active region} is assembled independently and in parallel.
+Note that our definition of an active region is similar in spirit but not in
+implementation to the ``active regions'' defined by the Complete Genomics
+variant caller \cite{carnevali12} and current versions of GATK \cite{depristo11}.
 
-% todo where to cite gatk, or various assembly papers?
-
-The assembly of an active region starts by splitting all reads assigned to the
-region into $k$-mers, where $k$ is a fixed parameter for all assemblies.
+The assembly of an active region is a kind of $k$-mer graph or ``Eulerian''
+approach \cite{pevzner01}.
+We start by splitting all reads assigned to the region into $k$-mers, where $k$
+is a fixed parameter for all assemblies.
 A read generates $L-k+1$ total $k$-mers.
 Each $k$-mer is uniquely identified by the substring of its originating read.
 Because of coverage overlap and sequence repeats, some $k$-mers will be
 duplicates;
 these are consolidated, and the duplication factor is recorded as the
 $k$-mer multiplicity.
-
 The $k$-mers define edges in the completed $k$-mer assembly graph.
 Within a read, each adjacent pair of $k$-mers have an overlapping substring of
 length $k-1$;
@@ -359,7 +379,7 @@ $H_j$ and $H_{j'}$, is defined to be \cite{albers11}:
 \end{align}
 We compute the posterior probability of observing the pair of haplotypes
 $H_j$ and $H_{j'}$ from the haplotype pair likelihood and a haplotype pair
-prior probability:
+prior probability \cite{albers11}:
 \begin{align}
   \mathbf P (H_j,H_{j'}|\{r_i\})&=\frac{1}{Z}\mathcal L(H_j,H_{j'})\mathbf P(H_j,H_{j'})
 \end{align}
@@ -369,11 +389,10 @@ where $Z$ is a normalization:
 \end{align*}
 and where we obtain the prior $\mathbf P (H_j,H_{j'})$ by aligning the haplotype
 pair with the same pairwise HMM alignment as above, and taking the product of
-the prior probabilities for each SNP and indel event
-\cite{albers11}.
+the prior probabilities for each SNP and indel event.
 
 We choose the maximum a priori estimate among haplotypes with any variants
-as the called non-reference maternal and paternal haplotype pair:
+as the called non-reference maternal and paternal haplotype pair \cite{albers11}:
 \begin{align}
   (H_\text{mat}^\text{nonref},H_\text{pat}^\text{nonref})&=\arg\max_{H_j,H_{j'}:n_\text{var}(H_j,H_{j'})>0}\mathbf P(H_j,H_{j'}|\{r_i\}).
 \end{align}
@@ -496,15 +515,15 @@ equivalent to a probability of $P=0.999999$ that the read is correctly mapped.},
 
 Since assembly depends on the exact sequences of the input data, the quality of
 the reads is critical for performing an accurate assembly.
-One error correction method is spectral filtering, which depends on the
-observation that the distribution of $k$-mers from all reads with respect to
+One error correction method is spectral filtering \cite{pevzner01}, which depends
+on the observation that the distribution of $k$-mers from all reads with respect to
 multiplicity is bimodal, one due to the Poisson sampling of reads (with high
 multiplicity), the other due to errors (with low multiplicity), so that splitting
 the reads between the two modes and keeping the reads near the mode with higher
-multiplicity serves to prune the poor quality reads. % todo cite original assembly paper
-Errors in the read data lead to \emph{spurs}, which are spurious short sections
-of the graph connected to the source or the sink.
-We do not remove spurs, although it may slightly improve performance.
+multiplicity serves to prune the poor quality reads.
+%Errors in the read data lead to \emph{spurs}, which are spurious short sections
+%of the graph connected to the source or the sink. % todo cite for spurs?
+%We do not remove spurs, although it may slightly improve performance.
 Empirically, we have found during other work that utilizing mate pair
 information greatly improves the quality of an assembly. % todo how to cite this?
 We also do not employ mate pair threading, which requires collecting the

@@ -1,8 +1,8 @@
 \BOOKMARK [1][-]{section.1}{Introduction}{}% 1
 \BOOKMARK [1][-]{section.2}{Related Work}{}% 2
 \BOOKMARK [2][-]{subsection.2.1}{ADAM}{section.2}% 3
-\BOOKMARK [2][-]{subsection.2.2}{The Genome Analysis Toolkit}{section.2}% 4
-\BOOKMARK [2][-]{subsection.2.3}{Samtools Mpileup}{section.2}% 5
+\BOOKMARK [2][-]{subsection.2.2}{Samtools Mpileup}{section.2}% 4
+\BOOKMARK [2][-]{subsection.2.3}{GATK}{section.2}% 5
 \BOOKMARK [2][-]{subsection.2.4}{FreeBayes}{section.2}% 6
 \BOOKMARK [2][-]{subsection.2.5}{SNAP}{section.2}% 7
 \BOOKMARK [2][-]{subsection.2.6}{SMaSH}{section.2}% 8
