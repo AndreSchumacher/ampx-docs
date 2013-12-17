@@ -141,7 +141,7 @@ of our system in~\S\ref{sec:evaluation}, and propose future research directions 
 \label{sec:related-work}
 
 There has been significant work related to variant calling, and towards accelerating the genomic processing pipeline. In this section, we
-discuss other variant calling pipelines, and tools that we use in our evaluation.
+discuss other variant callers, and tools that we use in our evaluation.
 
 \subsection{ADAM}
 \label{sec:adam}
@@ -149,13 +149,14 @@ discuss other variant calling pipelines, and tools that we use in our evaluation
 % Frank 0.33pg
 
 ADAM~\cite{massie13} is a new data format for genomics meant to replace the Sequence/Binary Alignment/Map~(SAM/BAM) formats for read
-data~\cite{li09}, and the Variant Call Format~(VCF) for variant/genotype data~\cite{danecek11}. The original SAM/BAM/VCF formats were
+data~\cite{li09sam}, and the Variant Call Format~(VCF) for variant/genotype data~\cite{danecek11}. The original SAM/BAM/VCF formats were
 designed for single-node processing, and do not easily distribute across several machines. Although a library was designed for processing
 BAM/VCF data in Hadoop~\cite{niemenmaa12}, this API does not scale well past 8 nodes. ADAM achieves scalability beyond 100 machines
 by eliminating the central file header, and by using the Parquet data store which is optimized for parallel data access~\cite{parquet}.
 
-In the process of developing \texttt{avocado}, we contributed 2,500 lines of code~(LOC) to the ADAM project. This contribution comprised
+In the process of developing \texttt{avocado}, we contributed 3,500 lines of code~(LOC) to the ADAM project. This contribution comprised
 the variant and genotype format, code for calculating normalized variant data from genotypes, and converters to/from the VCF format.
+Additionally, this contribution included code for translating between read and reference oriented views of data.
 
 \subsection{The Genome Analysis Toolkit}
 \label{sec:gatk}
@@ -182,15 +183,103 @@ the variant and genotype format, code for calculating normalized variant data fr
 
 % Frank 0.33pg
 
+SNAP is a high performance short-read aligner that is optimized for longer read lengths, and for distributed computing~\cite{zaharia11}.
+At the current moment, we have not integrated with SNAP, but long term, we plan to incorporate SNAP as the aligner in our read-alignment
+and variant calling pipeline. This is significant, as variant callers typically optimize to correct for the error models of the aligners that they
+coexist with.
+
+SNAP leverages the increasing length of reads to build a large alignment index, which is similar to the method used by
+BLAST~\cite{altschul90}, and which is dissimilar to the Burrows-Wheeler transform based methods used by BWA~\cite{li09bwa}. Aligners
+which use the Burrows-Wheeler transform perform very well in the absence of mismatching data---however, they cannot handle mismatches
+or inserts well. BWA has bad failure modes for reads with mismatches within the first 20 bases of the read, and Bowtie~\cite{langmead09}
+does not handle insertions when aligning. As SNAP will have better performance when aligning indels, it is likely that we will be able to
+omit the local realignment stage from ADAM~\cite{massie13}---this is significant as local realignment is the most expensive phase of
+read processing before variant calling.
+
 \subsection{SMaSH}
 \label{sec:smash}
 
 % Frank 0.33pg
 
+\textsc{SMaSH} is a benchmarking suite for alignment and variant calling pipelines~\cite{talwalkar13}, and was a key tool used for the
+evaluation of \texttt{avocado}.
+
+Traditionally, variant calling pipelines have been evaluated on concordance\footnote{Identifying overlap between the call set of multiple
+variant calling pipelines.}, and through using venn diagrams~\cite{tao13}. This is because genomics rarely has access to \emph{ground
+truth}: typical sequencing methods have insufficient fidelity to detect all variants clearly, and extremely high fidelity sequencing methods
+are too expensive/slow to be used in clinical practice. However, this method is fraught with risk: concordance is not a good metric to use if
+variant callers or aligners are making similar systemic errors.
+
+To address this problem, \textsc{SMaSH} leverages synthetic data which by definition has known ground truth, and rigorously verified
+mouse and human genomes. The human genomes and validation data come from the 1000 Genomes project, a project which surveyed
+the genomes of 1000 individuals using multiple sequencing technologies~\cite{siva08}. On top of this curated data, \textsc{SMaSH}
+provides a VCF based interface for determining the precision of a variant calling pipeline. Novel to this benchmarking suite, the authors
+introduced a ``rescue'' phase, which is used to resolve ambiguities that are caused by the VCF specification.
+
+It is worth noting that \textsc{SMaSH} does not include any datasets that are designed for joint variant calling. Because of this, we fall back
+on concordance as a metric for evaluating our joint variant calling algorithms which are described in~\S\ref{sec:joint-variant-calling}.
+
 \section{Architecture}
 \label{sec:architecture}
 
 % Frank 1pg
+
+When architecting \texttt{avocado}, we made a conscientious decision to prioritize modularity and extensibility. There are several reasons
+behind this design choice:
+
+\begin{itemize}
+\item Current variant calling pipelines are not meant to be extended. Because of this, anyone looking to prototype a new variant calling
+algorithm must implement their own variant calling infrastructure, which is a significant impediment to variant calling research.
+\item Although we have limited specialization in our current pipeline~(we specialize towards local assembly and pileup based SNP
+calling), long term we plan to add increasingly specialized variant calling algorithms.
+\item Similarly, it is known that modern variant callers perform poorly when calling structural variants~(SVs). This is a critical area that we
+hope to attack through specialized variant calling algorithms.
+\end{itemize}
+
+To improve modularity, we pushed as much functionality into the ADAM stack as possible~\cite{massie13}. ADAM implements several
+important transformations that are used on the read processing frontend, including sort-by-reference position, duplicate marking, base
+quality score recalibration~(BQSR), and local realignment~(see~\S\ref{sec:snap}). Additionally, we have moved portions of the variant
+calling stack into ADAM---after genotyping samples, we use the ADAM pipeline to transform genotypes into variant calls. We include
+a brief discussion of the merits of this approach in Appendix~\ref{sec:genotype-variant-refactoring}.
+
+A diagram of the \texttt{avocado} architecture is included in Figure~\ref{fig:architecture}.
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=0.9\linewidth]{avocado-architecture.pdf}
+\end{center}
+\caption{System Architecture}
+\label{fig:architecture}
+\end{figure}
+
+\texttt{avocado} is roughly divided into four stages:
+
+\begin{enumerate}
+\item \textbf{Read pre-processing:} Applies transformations from the ADAM pipeline, including sort, duplicate marking, BQSR, and
+local realignment. Operates strictly on read data.
+\item \textbf{Filtering:} Selects the best algorithm for calling variants on a segment of data; transforms data to be reference-oriented
+if necessary. This is discussed in~\S\ref{sec:algorithm-selection}.
+\item \textbf{Variant calling:} Calls genotypes for samples in input set on either read-oriented or reference-oriented data. These
+algorithms are discussed in~\S\ref{sec:local-assembly} and~\S\ref{sec:snp-calling}.
+\item \textbf{Variant filtering:} Here, variant data is calculated from genotypes using the ADAM API~\cite{massie13}. Additionally,
+variants can be filtered for quality.
+\end{enumerate}
+
+All stages are designed to be configurable, and easy to replace. Specifically, the filtering and variant calling stages are designed
+with a specific eye towards modularity. For variant calls, we provide a base class, and two specialized subclasses for variant
+calls that operate on either read or reference oriented data. A variant calling algorithm can be added by implementing one
+of these class interfaces, and then registering the call with a filter. For filters, we provide two filtering stages: the first operates
+on read data, and is used to implement the filter described in~\S\ref{sec:algorithm-selection}. The second filtering stage operates
+on pileup~(reference oriented) data---currently, we use this to filter out pileups that have no mismatch evidence. For both of these
+filters, we provide a simple interface for developers to implement.
+
+To improve pipeline performance, we made a significant optimization to the reads-to-pileup transformation step. At the start of
+transforming reads into reference oriented data, the reads are sorted by reference position. However, due to the partitioning
+used by Spark~\cite{zaharia10}, after a na\"{\i}ve transformation of reads to single reference oriented bases, the reference
+oriented bases are no longer sorted. This makes the ensuing grouping of bases by position very expensive due to significant disk
+shuffle I/O. Instead, we perform a quasi-streaming transform on the read data. Here, the sorted read blocks are chunked together.
+All of the reads in this window are then converted into pileup bases, and then grouped together into rods. This leads to significantly
+better performance, but has tricky edge cases: reads that border the end of a group must be duplicated into both read groups.
 
 \subsection{Local Assembly}
 \label{sec:local-assembly}
@@ -321,6 +410,47 @@ is defined as the Phred scaling of $\mathbf P_\text{error}$.
 
 % Frank .5pg
 
+As discussed in~\S\ref{sec:architecture}, we seek to improve the performance of our variant caller without reducing accuracy by directing
+the variant caller to use higher accuracy methods in areas that show increased complexity. Loosely, we define a complex region as an
+area that is highly similar to other areas of the genome, or where it is likely that a complex variant~(such as an indel) is segregating. To
+identify those regions, we use the following heuristics:
+
+\begin{itemize}
+\item Areas that are highly similar to other areas of the genome can be distinguished by low mapping quality. Reduced mapping quality
+indicates that alignment found several areas where the read could map with similar quality.
+\item Complex variants lead to a change in coverage over the effected area. Deletions will see reduced coverage, and insertions lead
+to increased coverage.
+\end{itemize}
+
+We implemented our filter by stepping a window across the reference genome. The window was stepped by 1000 base pairs. In each
+1000 base pair window, we would compute the average coverage, and mapping quality. If a window violated either of the mapping
+quality or the coverage threshold, we would flag it as high complexity and pass it to the assembler. If a window did not violate either
+of those two thresholds, we built pileups out of the data on this interval, and then used the SNP calling methods described
+in~\S\ref{sec:snp-calling}.
+
+We provided several tuning parameters to the end user. Specifically, the end user could set the target mapping quality and coverage
+deviation percentage~(percent change from mean coverage). Table~\ref{tab:filter} summarizes the sensitivity of these parameters.
+
+\begin{table}[h]
+\caption{\% Reads in High Complexity Region}
+\begin{center}
+\begin{tabular}{| c || c | c | c |}
+\hline
+\bf MapQ,Cov & \bf 0.2 & \bf 0.4 & \bf 0.6 \\
+\hline
+\hline
+\bf 40 & 88\% & 54\% & 20\% \\
+\bf 50 & 90\% & 56\% & 22\% \\
+\bf 60 & 98\% & 91\% & 88\% \\
+\hline 
+\end{tabular}
+\end{center}
+\label{tab:filter}
+\end{table}
+
+As can be noted, mapping complexity begins to saturate as the mapping quality threshold increases to 60\footnote{Phred-scaled 60 is
+equivalent to a probability of $P=0.999999$ that the read is correctly mapped.}, and as the coverage variation coefficient decreases to 0.2.
+
 \section{Evaluation}
 \label{sec:evaluation}
 
@@ -347,12 +477,28 @@ is defined as the Phred scaling of $\mathbf P_\text{error}$.
 \appendix
 
 \section{Availability}
+\label{sec:availability}
 
 \texttt{avocado} is open source and is licensed under the Apache 2 license. The source code is available at:
 
 \url{http://www.github.com/bigdatagenomics/avocado}
 
-% Frank 0.33pg
+\section{Genotype/Variant Refactoring}
+\label{sec:genotype-variant-refactoring}
+
+Traditionally, variant calling has involved genotyping $n$ samples, and then determining which of the genotypes of these samples
+contain true variants. This involves the calculation of a \textit{variant quality} score\footnote{Loosely defined as the likelihood that
+there is \emph{at least} one genotype with this variant out of all haplotypes seen in the call set.}, and filtering variants.
+
+Semantically, all of the information necessary for the creation of variant data can be extracted from the genotypes of the samples.
+Therefore, the step of packing/unpacking genotype data to create variant calls is unnecessary. To reduce the likelihood of making
+errors, we have migrated code to do this into the ADAM~\cite{massie13} framework. Then, to get variant calls, we must just genotype
+the samples we see, and call the ADAM library.
+
+This does not preclude joint variant calling---although joint variant calling implies that multi-sample data is being used to influence
+the filtering of variants, this is a bit of a misnomer. Practically, as discussed in~\S\ref{sec:joint-variant-calling}, joint variant calling
+involves the use of data from multiple samples to refine genotype probabilities across a population to support genotypes that are
+frequently seen in this population.
 
 %
 % The following two commands are all you need in the
