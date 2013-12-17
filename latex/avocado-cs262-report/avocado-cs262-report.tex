@@ -30,6 +30,7 @@
 
 \usepackage{url}
 \usepackage{hyperref}
+\usepackage{amsmath}
 
 \begin{document}
 
@@ -168,9 +169,16 @@ Additionally, this contribution included code for translating between read and r
 \subsection{Samtools Mpileup}
 \label{sec:samtools}
 
-% Brielin 0.33pg
-
-\cite{li11}
+Samtools Mpileup is a tool for Single Nucleotide Polymorphism (SNP) calling and genotyping aligned read data.  Given a set of
+reads from several individuals aligned to reference chromosomal position (a \emph{pileup}), Mpileup determines
+\begin{itemize}
+\item Is there statistically significant evidence that some individuals in the population have a non-reference allele at this position? (SNP calling)
+\item Given that there is a SNP, which individuals are homozygous for the reference base, which are heterozygous, and which are homozygous
+for the non-reference base? (genotyping)
+\end{itemize}
+Since reads from a single individual will contain sequencing errors that do not represent true genetic variation, samtools leverages
+the alignment and read quality from several individuals, and calls a site an variant if  the probability that all individuals in the sample
+are homozygous to the reference is small enough~\cite{li11}.
 
 \subsection{FreeBayes}
 \label{sec:freebayes}
@@ -395,13 +403,44 @@ The error probability of calling the non-reference haplotype pair is:
 The quality score of all variants present in the nonreference haplotype pair
 is defined as the Phred scaling of $\mathbf P_\text{error}$.
 
-\subsection{SNP Calling}
+\subsection{Genotype Calling}
 \label{sec:snp-calling}
 
+For one sample at a site, we can estimate the genotype likelihood based on the number of reads that match the
+reference genome and the quality of each of these reads. Let the number of reads at site $a$ be $k$ and the ploidy be $m$. Without
+loss of generality assume the first $l\leq k$ bases match the reference, and the rest do not. Let $\epsilon_j$ be the
+error probability of the $j$th read base. We have that,
+\begin{align}
+\mathcal{L}(g) =& \frac{1}{m^k} \prod_{j=1}^l \left[ (m-g)\epsilon_j + g( 1 - \epsilon_j )\right] \notag\\
+&\times\prod_{j=l+1}^k \left[(m-g)(1-\epsilon_j) + g\epsilon_j \right]
+\label{eq:likelihood}
+\end{align}
+
+Here we are only leveraging the data of a single sample. Performance can be improved by considering statistics associated
+with other samples. If a study involves sequencing many individuals from a population, it is beneficial to run them jointly in order
+to determine population parameters like per-locus allele frequency spectrum (AFS) and minor allele frequency (MAF)
+( \S~\ref{sec:joint-variant-calling}). However, when genotyping a single individual computational time can be saved by looking
+these parameters up in a database such as dbSNP. If the population MAF at site $a$ is $\phi_a$, the likelihood can be
+compensated by the prior probability of seeing a non-reference allele, and the genotype is
+\begin{equation}
+\hat{g}_{a} = \arg\max_g \frac{\mathcal{L}(g)P[g|\phi_a]}{\sum_g \mathcal{L}(g)P[g|\phi_a]}
+\end{equation}
+
+where $P[g|\phi] = {m\choose g} \phi^g (1-\phi)^{m-g}$ is the pmf of the binomial distribution.
 % Brielin .5pg
 
 \subsection{Joint Variant Calling}
 \label{sec:joint-variant-calling}
+When genotyping several individuals one may wish to genotype them jointly while determining population allele statistics,
+ especially when said individuals are from a specific population of interest. In this case, we can use the EM procedure of
+ Samtools Mpileup. Given the data for several individuals and using the likelihood in (\ref{eq:likelihood}), we can
+ infer the population MAF per site via iteration of
+ \begin{equation}
+ \phi_a^{(t+1)} = \frac{1}{M}\sum_{i=1}^n\frac{g\mathcal{L}(g)P[g | \phi_a^{(t)}] }{ \sum_g \mathcal{L}(g)P[g | \phi_a^{(t)}]}
+ \end{equation}
+ 
+ where $n$ is the number of individuals, $M=\sum_{i=1}^nm_i$ is the total number of chromosomes and $P$ is the binomial
+ likelihood described above. This population MAF can then be used in genotyping as above. 
 
 % Brielin .5pg
 
@@ -425,7 +464,7 @@ to increased coverage.
 We implemented our filter by stepping a window across the reference genome. The window was stepped by 1000 base pairs. In each
 1000 base pair window, we would compute the average coverage, and mapping quality. If a window violated either of the mapping
 quality or the coverage threshold, we would flag it as high complexity and pass it to the assembler. If a window did not violate either
-of those two thresholds, we built pileups out of the data on this interval, and then used the SNP calling methods described
+of those two thresholds, we built pileups out of the data on this interval, and then used the genotyping methods described
 in~\S\ref{sec:snp-calling}.
 
 We provided several tuning parameters to the end user. Specifically, the end user could set the target mapping quality and coverage

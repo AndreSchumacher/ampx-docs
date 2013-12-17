@@ -1,0 +1,20 @@
+\BOOKMARK [1][-]{section.1}{Introduction}{}% 1
+\BOOKMARK [1][-]{section.2}{Related Work}{}% 2
+\BOOKMARK [2][-]{subsection.2.1}{ADAM}{section.2}% 3
+\BOOKMARK [2][-]{subsection.2.2}{The Genome Analysis Toolkit}{section.2}% 4
+\BOOKMARK [2][-]{subsection.2.3}{Samtools Mpileup}{section.2}% 5
+\BOOKMARK [2][-]{subsection.2.4}{FreeBayes}{section.2}% 6
+\BOOKMARK [2][-]{subsection.2.5}{SNAP}{section.2}% 7
+\BOOKMARK [2][-]{subsection.2.6}{SMaSH}{section.2}% 8
+\BOOKMARK [1][-]{section.3}{Architecture}{}% 9
+\BOOKMARK [2][-]{subsection.3.1}{Local Assembly}{section.3}% 10
+\BOOKMARK [2][-]{subsection.3.2}{Genotype Calling}{section.3}% 11
+\BOOKMARK [2][-]{subsection.3.3}{Joint Variant Calling}{section.3}% 12
+\BOOKMARK [2][-]{subsection.3.4}{Algorithm Selection}{section.3}% 13
+\BOOKMARK [1][-]{section.4}{Evaluation}{}% 14
+\BOOKMARK [2][-]{subsection.4.1}{Accuracy}{section.4}% 15
+\BOOKMARK [2][-]{subsection.4.2}{Performance}{section.4}% 16
+\BOOKMARK [1][-]{section.5}{Future Work}{}% 17
+\BOOKMARK [1][-]{section.6}{Conclusion}{}% 18
+\BOOKMARK [1][-]{appendix.A}{Availability}{}% 19
+\BOOKMARK [1][-]{appendix.B}{Genotype/Variant Refactoring}{}% 20
