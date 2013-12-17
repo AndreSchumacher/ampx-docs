@@ -195,26 +195,86 @@ the variant and genotype format, code for calculating normalized variant data fr
 \subsection{Local Assembly}
 \label{sec:local-assembly}
 
-% Peter 1pg
+% TODO(peter, 12/16) Peter 1pg
 
+Given a partition of reads, we can group them by their starting locus in
+intervals of $W$, creating regions of length $W+L-1$ where $L$ is the
+read length.
+Within each region, we can evaluate the likelihood of observing the reads
+given the reference haplotype:
+\begin{align}
+  \mathcal L(H^\text{ref})
+  &\equiv\mathbf P(\{r_i\}|H^\text{ref}) \\ \nonumber
+  &=\prod_i\mathbf P(r_i|H^\text{ref})
+\end{align}
+where $\mathbf P(r|H)$ is obtained from aligning the read and the
+candidate haplotype by a pairwise HMM alignment.
+Note that, in practice, all probabilities are computed in units of logarithm
+base $10$, so products become sums, etc.
 
+If a reference haplotype likelihood is below a fixed threshold,
+the region corresponding to the haplotype is marked \emph{active}.
+Each \emph{active region} is assembled independently and in parallel.
+
+% todo where to cite gatk, or various assembly papers?
+
+The assembly of an active region starts by splitting all reads assigned to the
+region into $k$-mers, where $k$ is a fixed parameter for all assemblies.
+A read generates $L-k+1$ total $k$-mers.
+Each $k$-mer is uniquely identified by the substring of its originating read.
+Because of coverage overlap and sequence repeats, some $k$-mers will be
+duplicates;
+these are consolidated, and the duplication factor is recorded as the
+$k$-mer multiplicity.
+
+The $k$-mers define edges in the completed $k$-mer assembly graph.
+Within a read, each adjacent pair of $k$-mers have an overlapping substring of
+length $k-1$;
+these are seeded as the initial vertices in the $k$-mer graph.
+Because there are duplicated $k$-mers, some vertices will be ``merged,''
+connecting the graph.
+Unlike an exact de Bruijn graph, which connects all overlaps between $k$-mers,
+we only connect the overlaps found in the reads, performing a simple form of
+read threading.
+
+Once the $k$-mer graph is complete, we perform a depth-first traversal with an
+upper bound on the total path multiplicity, defined as the sum of the edge
+multiplicities, to enumerate a set of possible paths.
+The traversal begins at a graph source, and a completed path must also end at a
+sink.
+Each path is an assembled haplotype to be evaluated.
+
+% TODO(peter, 12/16) put this in future work?
+Since assembly depends on the exact sequences of the input data, the quality of
+the reads is critical for performing an accurate assembly.
+One error correction method is spectral filtering, which depends on the
+observation that the distribution of $k$-mers from all reads with respect to
+multiplicity is bimodal, one due to the Poisson sampling of reads (with high
+multiplicity), the other due to errors (with low multiplicity), so that splitting
+the reads between the two modes and keeping the reads near the mode with higher
+multiplicity serves to prune the poor quality reads. % todo cite original assembly paper
+Errors in the read data lead to \emph{spurs}, which are spurious short sections
+of the graph connected to the source or the sink.
+We do not remove spurs, although it may slightly improve performance.
+Empirically, we have found during other work that utilizing mate pair
+information greatly improves the quality of an assembly. % todo how to cite this?
+We also do not employ mate pair threading, which requires collecting the
+insert size distribution of the data, but we expect that implementing it has
+the potential to vastly improve the accuracy of variant calls.
 
 From the assembled haplotypes, we order them according to the haplotype
 likelihood:
 \begin{align}
   \mathcal L(H_j)
-  &\equiv\mathbf P(\{r_i\}|H_j) \\
-  &=\prod_i\mathbf P(r_i|H_j)
+  &=\prod_i\mathbf P(r_i|H_j).
 \end{align}
-where $\mathbf P(r_i|H_j)$ is obtained from aligning the read and the
-candidate haplotype by a pairwise HMM alignment.
 Among the ordered haplotypes, we pick the top scoring haplotypes and ignore
 the low scoring ones.
 The likelihood of observing the reads $\{r_i\}$, given a pair of haplotypes
 $H_j$ and $H_{j'}$, is defined to be: % cite dindel
 \begin{align}
   \mathcal L(H_j,H_{j'})
-  &\equiv\mathbf P(\{r_i\}|H_j,H_{j'}) \\
+  &\equiv\mathbf P(\{r_i\}|H_j,H_{j'}) \\ \nonumber
   &=\prod_i\left[ \frac{\mathbf P(r_i|H_j) }{2} + \frac{\mathbf P(r_i|H_{j'})}{2} \right].
 \end{align}
 We compute the posterior probability of observing the pair of haplotypes
@@ -237,11 +297,11 @@ as the called non-reference maternal and paternal haplotype pair:
   (H_\text{mat}^\text{nonref},H_\text{pat}^\text{nonref})&=\arg\max_{H_j,H_{j'}:n_\text{var}(H_j,H_{j'})>0}\mathbf P(H_j,H_{j'}|\{r_i\}).
 \end{align}
 Similarly, we may define the reference haplotype pair as
-$(H_\text{mat}^\text{ref},H_\text{pat}^\text{ref})$.
+$(H^\text{ref},H^\text{ref})$.
 The error probability of calling the non-reference haplotype pair is:
 \begin{align}
-  &\mathbf P_\text{error}(H_\text{mat}^\text{nonref},H_\text{pat}^\text{nonref}) \\\nonumber
-  &=\frac{\mathbf P(H_\text{mat}^\text{ref},H_\text{pat}^\text{ref})}{\mathbf P(H_\text{mat}^\text{nonref},H_\text{pat}^\text{nonref})+\mathbf P(H_\text{mat}^\text{ref},H_\text{pat}^\text{ref})}.
+  &\mathbf P_\text{error}(H_\text{mat}^\text{nonref},H_\text{pat}^\text{nonref}) \\ \nonumber
+  &=\frac{\mathbf P(H^\text{ref},H^\text{ref})}{\mathbf P(H_\text{mat}^\text{nonref},H_\text{pat}^\text{nonref})+\mathbf P(H^\text{ref},H^\text{ref})}.
 \end{align}
 The quality score of all variants present in the nonreference haplotype pair
 is defined as the Phred scaling of $\mathbf P_\text{error}$.
