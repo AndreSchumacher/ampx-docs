@@ -498,6 +498,63 @@ equivalent to a probability of $P=0.999999$ that the read is correctly mapped.},
 
 % Frank 0.5pg
 
+In this section, we present an evaluation of \texttt{avocado}. We evaluate the accuracy of our variant calls using \textsc{SMaSH}, which
+was introduced in~\S\ref{sec:smash}. All of our variant calling was run on Amazon Elastic Compute 2~(EC2), using the machine types
+listed in Table~\ref{tab:machines}.
+
+\begin{table}[h]
+\caption{EC2 Machine Types Used}
+\begin{center}
+\begin{tabular}{| c || c | c | c | c |}
+\hline
+\bf Machine & \bf CPU & \bf Memory\footnotemark & \bf Storage & \bf Cost\footnotemark \\
+\hline
+\hline
+\texttt{m2.4xlarge} & 8 & 68.4GiB & 2$\times$840GB & \$1.64 \\
+\texttt{cr1.8xlarge} & 32 & 244GiB & 2$\times$120GB & \$3.50 \\
+\texttt{hs1.8xlarge} & 16 & 117GiB & 20$\times$2,048GB & \$4.60 \\
+\hline 
+\end{tabular}
+\end{center}
+\label{tab:machines}
+\end{table}
+
+\addtocounter{footnote}{-1}
+\footnotetext{One Gibibyte~(GiB) is equal to $2^{30}$ bytes, as opposed to a Gigabyte~(GB) which is equal to $10^9$ bytes.}
+\addtocounter{footnote}{1}
+\footnotetext{Cost is per machine per hour.}
+
+The storage drive types were different between the two machines: the \texttt{m2.4xlarge} machines were backed by hard disk drives~(HDD),
+while the \texttt{cr1.8xlarge} machines are backed by solid state drives.
+
+The datasets used in testing \texttt{avocado} are listed in Table~\ref{tab:datasets}.
+
+\begin{table}[h]
+\caption{Datasets Used}
+\begin{center}
+\begin{tabular}{| l || c | c | c |}
+\hline
+\bf Dataset & \bf Type & \bf Size & \bf From \\
+\hline
+\hline
+Venter & Synthesized Human & 99GB & \cite{talwalkar13} \\
+\hline
+NA12878 & Human Whole Genome & 15GB & \cite{siva08} \\
+ & Chromosome 11 & 673MB & \cite{siva08} \\
+ & Chromosome 20 & 297MB & \cite{siva08} \\
+\hline
+\end{tabular}
+\end{center}
+\label{tab:datasets}
+\end{table}
+
+The Venter dataset is high coverage data~(30$\times$) coverage, and was generated using simNGS~\cite{massingham12}. The NA12878
+dataset is low coverage~(5$\times$) data, and was sequenced on an Illumina HiSeq2000. We chose these datasets because they allowed us
+to view several different areas in the design space---specifically, we have different coverage depths, as well as different file sizes. Long term,
+we are interested in adding the high coverage~(50$\times$) NA12878 dataset to our experiments, so that we can identify how strongly we
+perform on low vs. high coverage reads for the same dataset. Additionally, we plan to use \texttt{avocado} on cancer genomes starting in
+February of next year, when the datasets become available.
+
 \subsection{Accuracy}
 \label{sec:accuracy}
 
@@ -507,6 +564,37 @@ equivalent to a probability of $P=0.999999$ that the read is correctly mapped.},
 \label{sec:performance}
 
 % Frank 1pg
+
+\subsubsection{Multi-node Scaling}
+\label{sec:multi-node-scaling}
+
+A sample test case that demonstrates \texttt{avocado}'s ability to scale to multiple nodes is illustrated in figure~\ref{fig:speedup}. In this
+test case, we performed SNP-only genotyping on the NA12878, chromosome 11 dataset. All tests used a single Spark master node, and
+the number of computing slaves used was scaled from 1 to 8 \texttt{m2.4xlarge} nodes.
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=\linewidth]{speedup_na12878_chr11.pdf}
+\end{center}
+\caption{Multi-Node Processing: Speedup on NA12878, Chromosome 11}
+\label{fig:speedup}
+\end{figure}
+
+As can be noted, we see superlinear speedup for the 4 and 8 node cases. This occurs due to two reasons:
+
+\begin{enumerate}
+\item The 4 and 8 node cases exercise higher disk parallelism when reading and writing results, because the number of HDFS replicas
+is increased from 1 to 3 once there are more than three nodes~\cite{borthakur07}.
+\item Additionally, scaling beyond 2 nodes reduces memory backpressure. In Spark, memory backpressure causes data to be written to
+disk. Also, by increasing the number of disks in the system, we increase the aggregate disk throughput, which improves shuffle performance.
+\end{enumerate}
+
+As was reported in the ADAM technical report~\cite{massie13}, single node performance is improved the furthest by using a machine
+with a very large memory, and with many disks. Specifically, for processing a large file on a single node, we recommend using the
+\texttt{hs1.8xlarge} machine with the HDDs configured in redundant array of inexpensive disks~(RAID) 0.
+
+\subsubsection{Scaling Across Datasets}
+\label{sec:scaling-across-datasets}
 
 \section{Future Work}
 \label{sec:future-work}
