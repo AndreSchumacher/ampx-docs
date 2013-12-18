@@ -222,7 +222,7 @@ genomes tend to have high ploidy, and may have variable ploidy between samples. 
 when compared to the GATK, which assumes diploidy.
 \item Additionally, FreeBayes does not assume biallelism. This is an improvement over Samtools mpileup, which assumes
 biallelism when genotyping~\cite{li11}. However, it is worth noting that there are few sites where SNPs segregate into more than
-two alleles.
+two alleles~\cite{kruglyak97}.
 \end{itemize}
 
 FreeBayes has been indicated to have better accuracy than the GATK by researchers at Harvard, but the authors of FreeBayes
@@ -646,6 +646,9 @@ is formatted in these styles.
 
 % Frank 1pg
 
+In this section, we review the runtime performance of \texttt{avocado} on varying dataset sizes, and machine configurations. From this,
+we present areas for optimization, and recommendations for people using the system. Additionally, we highlight the factors that contribute
+to the performance characteristics of the system.
 
 \subsubsection{Multi-node Scaling}
 \label{sec:multi-node-scaling}
@@ -778,6 +781,24 @@ We hope to address these performance issues in release 0.0.2 at the beginning of
 \subsection{Structural Variant Calling}
 \label{sec:structural-variant-callling}
 
+Structural variant calling presents a great area for improvement in variant calling; modern structural variant callers are correct less than
+25\% of the time~\cite{talwalkar13}. Long term, we would like to improve on this performance by using specialized algorithms, as this
+is a key benefit of the modular toolkit we have designed. We see several significant opportunities:
+
+\begin{itemize}
+\item As demonstrated by GQL~\cite{kozanitis13}, there is significant opportunity to use algorithms like BreakDancer~\cite{chen09}
+along with filtering. BreakDancer is an algorithm for detecting long deletions and translocations using a split-read aligner. To support
+BreakDancer, we would need to have aligner support---this would require modifications to SNAP~\cite{zaharia11}.
+\item Another opportunity could come from using a full \emph{de novo} assembler for areas where indels are segregating. De novo
+assembly does not rely on a reference\footnote{Some de novo assemblers are \emph{reference assisted}, which means that they take
+some hints from a reference genome assembly.}, and is a more expensive formulation of the local assembly problem. Although
+de novo assembly is more expensive, it presents much higher accuracy for complex portions of the genome, such as near telomeres
+and centromeres~\cite{bresler12}.
+\end{itemize}
+
+By integrating these algorithms into \texttt{avocado}, we hope to achieve significantly higher structural variant calling accuracies
+than existing pipelines.
+
 \subsection{Improving Local Assembly}
 \label{sec:improving-local-assembly}
 
@@ -801,8 +822,36 @@ the potential to vastly improve the accuracy of variant calls.
 \subsection{Improved Region Filtering}
 \label{sec:improved-filtering}
 
+There are several efforts underway to improve variant calling outcomes through the filtering of reads. These methods are similar
+to the methods we implement in~\S\ref{sec:algorithm-selection}, but provide deeper formulations for their work. These
+methods include:
+
+\begin{itemize}
+\item \textbf{Similar Region Detection:} In this unreleased work, the reference sequence is evaluated to find regions that expose
+high similarity. This is done by forming a contig graph, and identifying highly connected regions. This detection is not performed
+at runtime; rather, it is performed once per region. The output of this tool includes regions where alignments cannot necessarily
+be trusted. To incorporate this, we would add a filtering block that would identify reads which group into similar regions, and then
+we would assemble the requisite number of haplotypes from this region, using the reference sequence as anchors.
+\item \textbf{Changepoint Detection:} This work uses an improved, more statistically rigorous set of heuristics to determine whether
+a region presents high complexity. Similar to our work, we would use assembly in these regions. We hope that this will improve
+the filtering, as we do not always catch indels in our filtering stage. However, it may be cheaper to use a simple heuristic and to
+then revert a block to assembly if we encounter indel evidence.
+\end{itemize}
+
+Thanks to the modular decomposition of our system, these two filtering implementations should be straightforward to implement.
+Additionally, the similar region detection system may necessitate the addition of a new schema to the ADAM toolkit for describing
+ranges in a genome.
+
 \section{Conclusion}
 \label{sec:conclusion}
+
+In this paper, we presented \texttt{avocado}, a distributed variant caller implemented using Spark and ADAM~\cite{zaharia10, massie13}.
+We illustrate the performance of the system across a variety of datasets including both high coverage sampled human genomes and
+low coverage human genomes. Major contributions of this system include the development of an open source local assembler, the use
+of filtering to determine when it is efficient to use local assembly instead of pileup based calling methods, the development of a system
+which can approximate joint genotyping with a single sample, and the development of a modular, open source platform for developing
+and prototyping new variant calling algorithms. We review the performance of this system on computing clusters containing up to 20 nodes;
+from these measurements, we identify areas for performance optimization, and plot a course for the continued development of this toolkit.
 
 \appendix
 
@@ -818,7 +867,8 @@ the potential to vastly improve the accuracy of variant calls.
 
 Traditionally, variant calling has involved genotyping $n$ samples, and then determining which of the genotypes of these samples
 contain true variants. This involves the calculation of a \textit{variant quality} score\footnote{Loosely defined as the likelihood that
-there is \emph{at least} one genotype with this variant out of all haplotypes seen in the call set.}, and filtering variants.
+there is \emph{at least} one genotype with this variant out of all haplotypes seen in the call set. However, notably,
+FreeBayes~\cite{garrison12} uses a different definition for variant quality.}, and filtering variants.
 
 Semantically, all of the information necessary for the creation of variant data can be extracted from the genotypes of the samples.
 Therefore, the step of packing/unpacking genotype data to create variant calls is unnecessary. To reduce the likelihood of making
