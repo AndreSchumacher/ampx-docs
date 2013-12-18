@@ -192,10 +192,15 @@ short read data into VCF output, where pipeline stages are generically called
 ``walkers'' and are invoked on the read data in a MapReduce style.
 
 In practice, the performance of GATK suffers due to a combination of architectural
-and engineering deficiencies.
-Actual parallelism among GATK walkers is limited.
-There are significant overheads due to disk I/O between pipeline stages and due
+and engineering deficiencies:
+
+\begin{itemize}
+\item Actual parallelism among GATK walkers is limited.
+\item There are significant overheads due to disk I/O between pipeline stages and due
 to poor algorithm or data structure design.
+\item The GATK requires expensive read processing stages like indel realignment, and base quality score recalibration.
+\end{itemize}
+
 Nonetheless, at the time we were developing \texttt{avocado}, GATK remained the
 state of the art in variant calling human data.
 
@@ -204,7 +209,24 @@ state of the art in variant calling human data.
 
 % Frank 0.33pg
 FreeBayes is a variant caller that uses pileup based calling methods, and incorporates read phasing information when calling
-variants~\cite{garrison12}.
+variants~\cite{garrison12}. Instead of performing graph based assembly, the authors describe a heuristic approach that narrows
+down the the interval on which phasing is captured by selectively eliminating locations where alleles that have unlikely evidence
+appear to segregate.
+
+FreeBayes has several advantages over other variant calling tools:
+
+\begin{itemize}
+\item FreeBayes does not have any limitations in terms of the ploidy, nor does it put any assumptions on the ploidy. This
+is important for working with samples with large deletions, and is also a significant advantage for working with plant data. Plant
+genomes tend to have high ploidy, and may have variable ploidy between samples. This presents a significant advantage
+when compared to the GATK, which assumes diploidy.
+\item Additionally, FreeBayes does not assume biallelism. This is an improvement over Samtools mpileup, which assumes
+biallelism when genotyping~\cite{li11}. However, it is worth noting that there are few sites where SNPs segregate into more than
+two alleles.
+\end{itemize}
+
+FreeBayes has been indicated to have better accuracy than the GATK by researchers at Harvard, but the authors of FreeBayes
+do not report accuracy nor performance numbers.
 
 \subsection{SNAP}
 \label{sec:snap}
@@ -589,6 +611,36 @@ our joint variant caller on NA12878 and NA18507. The data on callset overlap fro
 \label{tab:concordance}
 \end{table}
 
+This concordance data is promising---however, it is worth noting that since we do not currently support joint variant calling on the regions
+that we assemble, the variant calls resulting from assembly will be unchanged after joint calling, and will thusly always have 100\%
+concordance. We use the default filtering settings for this run, which means that 22\% of the genome will be assembled~(see
+Table~\ref{tab:filter}). However, due to the way we emit variant calls for assembled regions, assembly accounts for less than 22\%
+of the variant calls. There are several other important items to note about this data:
+
+\begin{itemize}
+\item The lack of joint assembly is partly accountable for the 13.3\% discordance from joint variant calling. Additionally, we do not filter out the
+variant calls that are called solely on NA18507, and not on NA12878. These calls will not overlap with the calls made in the single sample
+run using NA12878.
+\item We hope to experiment more with this data at a later point, with more samples. Joint calling methods depend significantly on the sample
+size used; by default, we seed the single sample calling pipeline with data from dbSNP~\cite{sherry01}. dbSNP contains a significantly larger
+set of data than used in this trial; it would be interesting to see how many samples are necessary to approach 100\% concordance between
+calling against dbSNP and traditional joint calling.
+\end{itemize}
+
+We view these results as promising, but note that this section requires additional progress. As soon as the ADAM to VCF pipeline is complete,
+we plan to run the following experiments:
+
+\begin{itemize}
+\item Use \textsc{SMaSH} to benchmark performance against validated datasets.
+\item Perform concordance measurements against established pipelines including the GATK and Mpileup.
+\end{itemize}
+
+While the \textsc{SMaSH} benchmarking numbers will provide us with feedback about the true accuracy of our pipeline, it is also important
+to validate concordance with other established tools. This is because low concordance would likely point to issues with the way we are formatting
+our variant calls. This would not be captured in \textsc{SMaSH}, as the rescue phase will mark these calls as correct~\cite{talwalkar13}. While
+these calls may be correct, it is important to be syntactically similar to existing tools, as variant annotation pipelines expect to see data that
+is formatted in these styles.
+
 \subsection{Performance}
 \label{sec:performance}
 
@@ -626,6 +678,8 @@ with a very large memory, and with many disks. Specifically, for processing a la
 \subsubsection{Scaling Across Datasets}
 \label{sec:scaling-across-datasets}
 
+Our performance changes as the size of data scales. This is demonstrated in Table~\ref{tab:scaling}.
+
 \begin{table}[h]
 \begin{center}
 \begin{tabular}{| l || c | c |}
@@ -639,17 +693,87 @@ with a very large memory, and with many disks. Specifically, for processing a la
 \hline
 \end{tabular}
 \end{center}
+\label{tab:scaling}
 \end{table}
+
+We note the following about how our algorithm scales with data size:
+
+\begin{itemize}
+\item For filtering, we must perform three large reductions at the immediate start of variant calling. On the whole genome Venter case,
+we noted several large stragglers during these reductions. Additionally, Spark fails to pipeline these reductions.
+\item We see greater scalability than expected when moving from chromosome 20 on NA12878 to chromosome 11. Although
+chromosome 11 is 2.26$\times$ larger than chromosome 20, it's execution is only 1.8$\times$ slower. This is due to limited parallelism
+at the beginning of the pipeline.
+\end{itemize}
+
+We are currently investigating the reduction issue---although we are not sure of why there is significant skew, we can reduce the impact
+of this skew by manually pipelining the three reductions, as the operate on the same dataset. The limited parallellism at the start of
+the pipelines is only a limitation for smaller datasets. This limitation arises from Parquet, and is due to the parameters passed to
+ADAM when converting BAM files to the ADAM format. Currently, we opt to increase the parallelism by coalescing the data into
+more partitions. We choose to at least match the core count of the machines we are running on. This increases parallelism, but comes
+at a cost: this coalesce operation requires data to be shuffled on disk.
 
 \subsubsection{Joint Variant Calling Performance}
 \label{sec:jvc-performance}
 
-0.45
+We tested our joint variant caller by jointly calling chromosome 20 of both NA12878 and NA18507; these two chromosomes account
+for 533 MB of data. In this test, we were able to joint call the two samples in 0.45 hours. Readers may note that this number is lower
+than expected, based off of the data from Table~\ref{tab:scaling}; in this table, we illustrate that we can call 673 MB of data in 0.47 hours.
+This discrepancy can be explained by the inclusion of the EM algorithm described in~\S\ref{sec:joint-variant-calling}. This algorithm requires
+several iterations to converge, and requires the creation of a matrix that is significantly larger than the vector used for genotyping. It is quite likely
+that this would lead to decreased performance. Additionally, sort consumes more time for the two genome case. We believe that this is because
+the act of appending two sets of read data together eliminates any advantages that are obtained from having the read data come in with
+reasonable local sorting. Thusly, we require additional shuffling when sorting the union of the data.
 
 \section{Future Work}
 \label{sec:future-work}
 
 % Frank 1pg
+
+Several points for future work are noted elsewhere in this paper; the most significant necessary future work is noted
+in~\S\ref{sec:accuracy}. This section covers other areas that we hope to address in a future revision of \texttt{avocado}.
+
+As a project, \texttt{avocado} has a well defined path for future research:
+
+\begin{itemize}
+\item A major driving goal for this project is to be able to call variants across a full, very high coverage genome within a
+couple of hours. Currently, we call variants in 6 hours on 20 machines on a 30$\times$ coverage genome. Within several
+months, we hope to call variants on a 60$\times$ coverage genome in less time.
+\item Although \texttt{avocado} currently is designed for germline variant calling, we hope to use this tool for calling
+variants on tumor genomes. A full discussion of the changes necessary for tumor calling is out of the scope of this paper,
+rather, we refer interested readers to the Cibulskis et al, which discusses an adaptation of the GATK for mutation calling~\cite{cibulskis13}.
+\end{itemize}
+
+From a timeline perspective, we hope to integrate \texttt{avocado} with SNAP~\cite{zaharia11} by the end of January 2014.
+We expect that this project will reach maturity in the spring of 2014, and to use it on patient data by the middle/end of 2014.
+
+\subsection{Performance Bottlenecks}
+\label{sec:performance-bottlenecks}
+
+Currently, there exist several significant performance bottlenecks in our pipeline. We need to address these bottlenecks
+in order to hit the performance targets outlined above. These performance bottlenecks include the following:
+
+\begin{itemize}
+\item Although read to pileup creation time has been reduced, there is still a significant latency hit taken because these steps
+appear to emit unsorted pileups. We have tried to locally sort the pileups during creation, but this does not impact the output. We
+believe this is due to using an unsorted Spark partitioner. This is important because it is desirable to emit sorted variants---additionally,
+we would prefer to have our variants sorted, as this minimizes shuffle traffic when performing variant filtering. One approach we are
+considering to ameliorate this issue involves refactoring the mechanism we use for distributing data between the calling methods.
+We hope that we can change the signature for our variant callers to operate on partitions of read data, which would allow us to 
+assign calls to sorted read partitions, and perform the calling in situ. As long as the calls emitted per partition are sorted, this would
+maintain sorted order on the variants.
+\item As discussed in~\S\ref{sec:scaling-across-datasets}, we struggle when computing basic statistics on larger datasets. We propose
+a solution to the problem of reductions not being pipelined in that section, but we also must point out that key skew remains an issue.
+What may help to address this issue is to perform these reductions after reads have been reduplicated and sorted. The sorting process
+has optimizations that reduce key skew across partitions. These optimizations came about due to problems encountered when sorting
+sets of reads that include unmapped reads~\cite{massie13}.
+\item Our current genotype to variant conversion code requires a group-by on the genotype data. As noted two bullets above, this is
+problematic because we do not currently guarantee ordering on the genotype data, which leads to poor group-by performance. One
+approach that may improve this is to refactor this code to not require coordination between the variant context object, the variant,
+and the genotype. This would eliminate a group-by, which would lead to a significant performance gain when emitting variants.
+\end{itemize}
+
+We hope to address these performance issues in release 0.0.2 at the beginning of 2014.
 
 \subsection{Structural Variant Calling}
 \label{sec:structural-variant-callling}
@@ -673,6 +797,9 @@ information greatly improves the quality of an assembly. % todo how to cite this
 We also do not employ mate pair threading, which requires collecting the
 insert size distribution of the data, but we expect that implementing it has
 the potential to vastly improve the accuracy of variant calls.
+
+\subsection{Improved Region Filtering}
+\label{sec:improved-filtering}
 
 \section{Conclusion}
 \label{sec:conclusion}
