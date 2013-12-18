@@ -203,7 +203,8 @@ state of the art in variant calling human data.
 \label{sec:freebayes}
 
 % Frank 0.33pg
-\cite{garrison12}
+FreeBayes is a variant caller that uses pileup based calling methods, and incorporates read phasing information when calling
+variants~\cite{garrison12}.
 
 \subsection{SNAP}
 \label{sec:snap}
@@ -542,6 +543,8 @@ Venter & Synthesized Human & 99GB & \cite{talwalkar13} \\
 NA12878 & Human Whole Genome & 15GB & \cite{siva08} \\
  & Chromosome 11 & 673MB & \cite{siva08} \\
  & Chromosome 20 & 297MB & \cite{siva08} \\
+ \hline
+ NA18507 & Chromosome 20 & 236MB & \cite{siva08} \\
 \hline
 \end{tabular}
 \end{center}
@@ -560,10 +563,37 @@ February of next year, when the datasets become available.
 
 % Frank 1pg
 
+Due to an incompatibility with Hadoop-BAM and ADAM~\cite{massie13, niemenmaa12}, we were unable to export a VCF file from our variant
+calling pipeline. This precludes us from running \textsc{SMaSH} on our calls, and prevents us from determining accuracy and recall numbers
+against validated data. We are currently working very closely with the Hadoop-BAM team to resolve this issue---specifically, the ADAM Variant
+and Genotype data can be converted over to the internal representation used for the VCF, but the internal representation for VCF data cannot
+be written out to disk in Spark from Scala. It appears that this issue stems from the Hadoop Job configuration, and we hope to have this issue
+resolved by the beginning of January.
+
+However, we are able to obtain concordance data from running joint variant calling. We ran our standalone variant caller on NA12878, and
+our joint variant caller on NA12878 and NA18507. The data on callset overlap from this run is contained in Table~\ref{tab:concordance}.
+
+\begin{table}[h]
+\caption{Joint Variant Calling Concordance}
+\begin{center}
+\begin{tabular}{| c | c | c |}
+\hline
+\bf NA12878 & \bf Overlap & \bf Joint Calling \\
+\hline
+\hline
+14.8M & 13.7M & 15.8M \\
+92.5\% & --- & 86.7\% \\
+\hline
+\end{tabular}
+\end{center}
+\label{tab:concordance}
+\end{table}
+
 \subsection{Performance}
 \label{sec:performance}
 
 % Frank 1pg
+
 
 \subsubsection{Multi-node Scaling}
 \label{sec:multi-node-scaling}
@@ -596,10 +626,36 @@ with a very large memory, and with many disks. Specifically, for processing a la
 \subsubsection{Scaling Across Datasets}
 \label{sec:scaling-across-datasets}
 
+\begin{table}[h]
+\begin{center}
+\begin{tabular}{| l || c | c |}
+\hline
+\bf Sample & \bf Time & \bf Machines \\
+\hline
+\hline
+\bf Venter & 6hr & 20$\times$\texttt{cr1.8xlarge} \\
+\bf NA12878, chr11 & 0.47hr & 4$\times$\texttt{m2.4xlarge} \\
+\bf NA12878, chr20 & 0.25hr & 4$\times$\texttt{m2.4xlarge} \\
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+\subsubsection{Joint Variant Calling Performance}
+\label{sec:jvc-performance}
+
+0.45
+
 \section{Future Work}
 \label{sec:future-work}
 
 % Frank 1pg
+
+\subsection{Structural Variant Calling}
+\label{sec:structural-variant-callling}
+
+\subsection{Improving Local Assembly}
+\label{sec:improving-local-assembly}
 
 Since assembly depends on the exact sequences of the input data, the quality of
 the reads is critical for performing an accurate assembly.
