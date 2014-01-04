@@ -2,7 +2,7 @@
 \copyrightyear{2014}
 \pubyear{2014}
 \usepackage{url}
-
+ 
 \begin{document}
 \firstpage{1}
 
@@ -26,12 +26,12 @@ $^{5}$Carl Icahn School of Medicine at Mount Sinai, New York, NY}
 \begin{abstract}
 
 \section{Motivation:}
-Current genomics data formats and processing pipelines are not designed to process large datasets quickly. As the quantity of genetic
-data continues to increase, it is desirable to be able to process this data in the cloud. We introduce a new set of file formats that are
-designed for cloud computing as a potential successor to the BAM and VCF standards.
+Current genomics data formats and processing pipelines are not designed to process large datasets quickly. As the quantity of genetic data continues to increase, it is 
+desirable to be able to process this data in using very large clusters or the cloud. We introduce a new set of language-independent file formats that are designed for
+cluster and cloud computing as a potential successor to the BAM and VCF standards.
 
-\section{Results:} On a high coverage~(60$\times$) 250GB NA12878 BAM file, we are able to perform Sorting and Duplicate Marking in under
-50 minutes on 100 node cluster~(a 50$\times$ performance improvement). On a single node, we are twice as fast as Picard and Samtools. ADAM files are up to 25\%
+\section{Results:} On a high coverage~(60$\times$) 250GB NA12878 BAM file, we are able to perform Sorting and Duplicate Marking in under 50 minutes on 100 node
+cloud-based cluster~(a 50$\times$ performance improvement). On a single node, we are twice as fast as Picard and Samtools. ADAM files are up to 25\%
 smaller than equivalent compressed BAM files.
 
 \section{Availability:}
@@ -44,16 +44,14 @@ and the source is available through GitHub.
 \section{Introduction}
 \label{sec:introduction}
 
-The Sequence/Binary Alignment/Map~(SAM/BAM) and Variant Call Format~(VCF) file formats were designed before multi-node processing
-and cloud computing were in vogue---thusly, they were designed for single node processing~\citep{li09}. As noted by \citet{mcpherson09}, as
-next generation sequencing~(NGS) methods continue to improve, the latency of alignment and variant calling is becoming increasingly costly
-for scientists who are using genomics in a clinical setting, or who are working on very large datasets. To address this issue, it is desirable to be
-able to compute on genomic data across many machines, but characteristics of the BAM and VCF file formats practically limit scalability to 8
-nodes~\citep{niemenmaa12}.
+The Sequence/Binary Alignment/Map~(SAM/BAM) and Variant Call Format~(VCF) file formats were designed before multi-node processing and cloud computing were
+in vogue---thusly, they were designed for single node processing~\citep{li09}. As noted by \citet{mcpherson09}, as next generation sequencing~(NGS) methods continue
+to improve, the latency of alignment and variant calling is becoming increasingly costly for scientists who are using genomics in a clinical setting, or who are working on
+very large datasets for genome wide association studies~(GWAS, see~\citet{wang05}). To address this issue, it is desirable to be able to compute on genomic data across
+many machines, but characteristics of the BAM and VCF file formats practically limit scalability to 8 nodes~\citep{niemenmaa12}.
 
-As the scalability limitations are inherent to the file formats\footnote{This is discussed in more detail in \S\ref{sec:approach}.}, we
-choose to rethink file formats for genomics, instead of looking to incrementally improve either BAM or VCF. We view the following
-points as critical design questions:
+As the scalability limitations are inherent to the file formats\footnote{This is discussed in more detail in \S\ref{sec:approach}.}, we choose to rethink file formats for genomics
+using the benefit of experience and hindsight, instead of looking to incrementally improve either BAM or VCF. We view the following points as critical design questions:
 
 \begin{itemize}
 \item BAM and VCF optimize for row-oriented, flat file access. Is this access pattern the best pattern for genomics?
@@ -81,15 +79,14 @@ node, we are able to speedup sort and duplicate marking by 2$\times$. More impor
 human genome, this system achieves a 50$\times$ speedup on a 100 node computing cluster, fulfilling the promise of scalability of ADAM.
 We provide an extensive review of ADAM's performance in~\S\ref{sec:performance}.
 
-The ADAM format provides explicit schemas for read and reference oriented~(pileup) sequence data, variants, and genotypes. As the
-schemas are implemented in Apache Avro---a cross-platform/language serialization format---they eliminate
-the need for the development of language-specific libraries for format decoding/encoding, which eliminates the possibility of library
-incompatibilities. Additionally, any application that implements the ADAM schema is compatible with ADAM. This prevents
-applications from being locked into a specific tool or pattern. The ADAM stack is inspired by the ``narrow waist'' of the Internet Protocol~(IP)
-suite (see Figure~\ref{fig:stack-model}). We consider this stack model to be the greatest contribution of ADAM.
+The ADAM format provides explicit schemas for read and reference oriented~(pileup) sequence data, variants, and genotypes. As the schemas are implemented in Apache
+Avro---a cross-platform/language serialization format---they eliminate the need for the development of language-specific libraries for format decoding/encoding, which
+eliminates the possibility of library incompatibilities and---more importantly---programming errors. Additionally, any application that implements the ADAM schema is
+compatible with ADAM. This prevents applications from being locked into a specific tool or pattern. The ADAM stack is inspired by the ``narrow waist'' of the Internet
+Protocol~(IP) suite (see Figure~\ref{fig:stack-model}). We consider this stack model to be the greatest contribution of ADAM.
 
-In this paper, we start by introducing why a new approach is necessary, and what our new approach is in~\S\ref{sec:approach}. We review the
-design and performance of our pipeline in~\S\ref{sec:methods} and~\S\ref{sec:performance}. Finally, we provide a comprehensive comparison of
+In this paper, we start by discussing why a new approach is necessary, and what our new approach is in~\S\ref{sec:approach}. We review the
+design and performance of our pipeline in~\S\ref{sec:methods}. Finally, we provide a comprehensive comparison of
 ADAM against other data formats and discuss the future growth of ADAM in~\S\ref{sec:discussion}.
 
 \section{Approach}
@@ -109,11 +106,11 @@ this points at another problem: some modern bioinformatics file formats lock use
 several reasons that traditional flat file formats are not ideal for genomics, such as:
 
 \begin{itemize}
-\item \textbf{Database Queries:} Extending BAM to provide standard database queries required a significant extension~\citep{kozanitis13}.
+\item \textbf{Database Queries:} Extending BAM to support standard database queries required a significant extension~\citep{kozanitis13}.
 No such extension exists for VCF data.
 \item \textbf{Efficient Predication:} Typically, a user would only like to process a subset of records. Currently, for both BAM and VCF, a user must load all
 records and then perform a filter, which is inefficient. BAM supports the inclusion of an index file~(BAM Index, BAI), but this index file can only accelerate
-reference position based filtering patterns\footnote{Typically, the first step of variant calling involves a filter that removes low quality reads. These filters
+reference position-based filtering patterns\footnote{Typically, the first step of variant calling involves a filter that removes low quality reads. These filters
 are based on position-independent data~(e.g. mapping quality, boolean flags) and cannot be accelerated with the BAI.}.
 \item \textbf{Projection of Specific Fields:} It is typical for an application to only read some fields of a BAM record across all records, especially for
 statistics collection tools like SAMtools' \texttt{flagstat}~\citep{li09}. Row-oriented formats like BAM and VCF cannot support these access patterns.
@@ -174,10 +171,10 @@ As noted above, for a system to implement the ADAM format, it must read/write AD
 tool/vendor lock-in.
 
 A well defined software stack has several other significant advantages. By limiting application interactions with layers lower than the presentation layer,
-application developers are given a clear and consistent view of the data they are processing. By divorcing the API from the data
-access layer, we unlock significant flexibility. With careful design in the data format and data access layers, we can seamlessly
-support conventional flat file access patterns, while also allowing easy access to data with database methods. By treating the
-compute substrate and storage as separate layers, we also drastically increase the portability of the APIs that we implement.
+application developers are given a clear and consistent view of the data they are processing, and this view of the data is independent of whether the data
+is local or distributed across a cluster or cloud. By divorcing the API from the data access layer, we unlock significant flexibility. With careful design in the data
+format and data access layers, we can seamlessly support conventional flat file access patterns, while also allowing easy access to data with database methods.
+By treating the compute substrate and storage as separate layers, we also drastically increase the portability of the APIs that we implement.
 
 \subsection{Reference Implementation}
 \label{sec:reference-implementation}
@@ -205,7 +202,8 @@ disk I/O and by improving resource utilization by pipelining computation. This p
 we are able to lessen the disk I/O penalty and improve latency.
 \item Many genomic processing stages are iterative. For many applications, iteration implies that stages can be pipelined, which improves system performance on large
 parallel systems\footnote{Performance is improved as pipelining reduces the number of executors that become idle at the start and end of stages by overlapping the
-two stages.}. 
+two stages.}.
+\item Additionally, memory cost and capacity is improving very quickly. Datacenters are moving towards a model where large ``clouds'' of memory are replacing storage.
 \end{itemize}
 
 An additional benefit of Spark is that its programming interface supports Java, Scala, and Python\footnote{A programming interface for the R programming language will
@@ -216,7 +214,7 @@ be available in the first half of 2014.}.
 
 Parquet is a columnar file format that is designed for distributed computing. Columnar stores differ from conventional file formats as they group data together
 by field instead of by record\footnote{In other words, all values for a single field are stored sequentially on disk.}. This orientation enables very high read performance, improved
-compression~\citep[see][]{abadi06}, and the efficient serialization of a subset of fields. Parquet has otherbenefits:
+compression~\citep[see][]{abadi06}, and the efficient serialization of a subset of fields. Parquet has other benefits:
 
 \begin{itemize}
 \item Parquet operates by splitting a single ``file'' into many smaller files that contain \emph{row groups}\footnote{In Parquet, a \emph{row group} contains a subset
@@ -226,8 +224,8 @@ parallelism.
 A detailed analysis of Parquet's predicate pushdown functions for genomics applications can be found in \citet{massie13}.
 \end{itemize}
 
-Figure~\ref{fig:file-format} shows how ADAM in Parquet compares to BAM. We remove the file header from BAM, and instead distribute these values across all of the records
-stored. This dissemination eliminates global information and makes the file much simpler to distribute across machines. This distribution is effectively free in a columnar store,
+Figure~\ref{fig:file-format} shows how ADAM in Parquet compares to BAM. We remove the file header from BAM, and instead distribute these values across all of the stored
+records. This dissemination eliminates global information and makes the file much simpler to distribute across machines. This distribution is effectively free in a columnar store,
 as the store just notes that the information is replicated across many reads.
 
 \begin{figure}[h]
@@ -250,8 +248,8 @@ Our reference pipeline implementation provides two components:
 \section{Methods}
 \label{sec:methods}
 
-ADAM contains formats for storing read and reference oriented sequence information, and variant/genotype data. The read oriented sequence format is both forwards and
-backwards compatible with BAM/SAM, and the variant/genotype data is forwards and backwards compatible with VCF. In this section, we discuss the specific data formats
+ADAM contains formats for storing read and reference oriented sequence information, and variant/genotype data. The read oriented sequence format is both forward and
+backward compatible with BAM/SAM, and the variant/genotype data is forwards and backwards compatible with VCF. In this section, we discuss the specific data formats
 that we provide. Additionally, we describe the \texttt{adam-cli} toolkit and \texttt{adam-core} API which were introduced in~\S\ref{sec:reference-implementation}.
 
 \subsection{Data Format and Schema}
@@ -261,7 +259,7 @@ The data representation for the ADAM format is described using the open source A
 readable schema description language that can auto-generate the schema implementation in several common languages including C/C++/C\#, Java/Scala, php, Python, and
 Ruby. This flexibility provides a significant cross-compatibility advantage over the BAM/SAM format, where the data format has only been implemented for C/C++ through
 Samtools~\citep{li09} and for Java through Picard~\citep{picard}. Additionally, there are known incompatibilities between these different implementations---by using Avro,
-we eliminate these platform compatibility issues.
+we eliminate these and future platform compatibility issues.
 
 The data types presented in this section make up the narrow waist of our proposed genomics stack in Figure \ref{fig:stack-model}. We provide the following primary datatypes:
 
@@ -285,7 +283,7 @@ An individual ADAMRecord is equivalent to a single read stored in SAM/BAM format
 is done by replicating the information that is contained in the header across all records. While this would be too expensive to implement in a traditional row-oriented file format,
 the use of a columnar storage format like Parquet allows us to use run-length encoding~(RLE) to make this tractable. RLE is an efficient method that encodes that a single piece
 of information is replicated across many~(not necessarily all) records. Even though we replicate the header information across all records, ADAMRecord data consumes less
-space than BAM---ADAMRecord files are between 2\% and 25\% smaller than a compressed BAM file.
+space than BAM---ADAMRecord files are between 2\% and 25\% smaller than a compressed BAM file. By reducing the file size, we improve both read and write performance.
 
 \paragraph{ADAMPileup, Locus-Oriented DNA Data:}
 \label{sec:adampileup}
@@ -304,14 +302,14 @@ We do realize that many users are interested in viewing bases through the tradit
 efficient access to this data.
 
 Additionally, we provide \emph{pileup aggregation}, a technique that is similar to \texttt{ReducedReads}~\citep[see][]{mckenna10}. Pileup aggregation takes all bases that
-share a base type~(e.g. cytosine, guanine, etc.), and averages their statistical values. This technique is useful in some circumstances~(e.g. data archival) as it leads to a
+share a base type~(e.g., cytosine, guanine, etc.), and averages their statistical values. This technique is useful in some circumstances~(e.g., data archival) as it leads to a
 reduction in the amount of data stored that scales approximately as $O(1/coverage)$.
 
 \paragraph{ADAMGenotype, Single Chromosome Genotypes, and ADAMVariant, Multi-Sample Variant Data:}
 \label{sec:adamvariant}
 
 ADAM implements genotypes without relying on the context of a variant. An individual ADAMGenotype record describes a called genotype on a single chromosome of a
-sample. The metrics fields of a genotype~(e.g. quality) mirror the metrics fields of the variant type. This enables genotypes to be expressed without the centralized notion
+sample. The metrics fields of a genotype~(e.g., quality) mirror the metrics fields of the variant type. This enables genotypes to be expressed without the centralized notion
 of a variant---this is useful for data warehousing, where the genotypes of many samples may be gathered. At a later point in time, it may be desirable to collect and distribute
 variant calls for a subset of these samples; this subset may span multiple variant calling runs. By mirroring fields between Genotype and Variant records, we allow ourselves
 to compute variant statistics from a set of genotypes without having access to the raw read data. This transformation is implemented in both the \texttt{adam-cli} and the
@@ -345,24 +343,42 @@ We discuss the command line utilities that we provide, and give a brief overview
 \paragraph{Command Line Utilities:}
 \label{sec:command-line-utilities}
 
-The \texttt{adam-cli} suite of command line utilities implements several important features. They include:
+The \texttt{adam-cli} suite of command line utilities implements several important features. They include a set of converters which are depicted in Table~\ref{tab:converters},
+and a set of utilities which are described in Table~\ref{tab:utilities}.
 
-\begin{itemize}
-\item Converters between:
-\begin{itemize}
-\item ADAMRecord $\leftrightarrow$ SAM/BAM
-\item ADAMVariant and ADAMGenotype $\leftrightarrow$ VCF
-\item ADAMRecord $\rightarrow$ ADAMPileup
-\item ADAMRecord $\rightarrow$ SAMtools style pileups 
-\end{itemize}
-\item \textit{AggregatePileups}, which aggregates pileup data~(see~\S\ref{sec:adampileup}),
-\item \textit{CompareAdam}, which compares two ADAM read files,
-\item \textit{ComputeVariants}, which computes variant data from a set of genotypes~(see~\S\ref{sec:adamvariant}),
-\item \textit{Flagstat}, which is analogous to SAMtools' \texttt{flagstat} command,
-\item \textit{ListDict}, which lists the content of an ADAM sequence dictionary,
-\item \textit{PrintAdam}, which prints the contents of an ADAMRecord file, and
-\item \textit{Transform}, which allows users to perform sorting, duplicate marking, and BQSR on read data.
-\end{itemize}
+\begin{table}[h]
+\processtable{Command Line Format Converters\label{tab:converters}}
+{\begin{tabular}{ c c c }
+\toprule
+\bf Format 1 & \bf Direction & \bf Format 2 \\
+\midrule
+ADAMRecord & $\leftrightarrow$ & SAM/BAM \\
+ADAMVariant \& ADAMGenotype & $\leftrightarrow$ & VCF \\
+ADAMRecord & $\rightarrow$ & ADAMPileup \\
+ADAMRecord & $\rightarrow$ & SAMtools style pileups \\
+\botrule
+\end{tabular}}{}
+\end{table}
+
+As is noted in~\S\ref{sec:adampileup}, our pileup format allows for read data to be reassembled from pileups. However, readers may note that a converter from ADAMPileups
+to ADAMRecords is not listed in Table~\ref{tab:converters}. We are in the process of adding this converter to the \texttt{adam-cli} toolbox.
+
+\begin{table}[h]
+\processtable{Command Line Utilities\label{tab:utilities}}
+{\begin{tabular}{ l p{6cm} }
+\toprule
+\bf Command & \bf Description \\
+\midrule
+\textit{AggregatePileups} & Aggregates pileup data~(see~\S\ref{sec:adampileup}) \\
+\textit{CompareAdam} & Compares two ADAM read files, and depicts differences \\
+\textit{ComputeVariants} & Computes variant data from a set of genotypes~(see~\S\ref{sec:adamvariant}) \\
+\textit{Flagstat} & Analogous to SAMtools' \texttt{flagstat} command \\
+\textit{ListDict} & Lists the content of an ADAM sequence dictionary \\
+\textit{PrintAdam} & Prints the contents of an ADAMRecord file \\
+\textit{Transform} & Performs sorting, duplicate marking, and/or BQSR on read data \\
+\botrule
+\end{tabular}}{}
+\end{table}
 
 The translations between ADAM and SAM/BAM/VCF use the Hadoop-BAM framework~\citep[see][]{niemenmaa12} to read and write SAM/BAM/VCF data---this allows for these
 translations to be distributed, which accelerates the translations. Similarly, all of the commands that operate on read data can operate on ADAMRecord, SAM, or BAM data;
@@ -372,44 +388,55 @@ if SAM or BAM data is provided, it is transformed on-demand into ADAMRecords.
 \label{sec:api-transforms}
 
 The \texttt{adam-core} API provides an extensive set of transformations that are performed on data stored in Resilient Distributed Dataset~(RDD) form. RDDs were introduced
-in \citet{zaharia12} as a fault-tolerant abstraction for distributing an array of data across multiple machines. The API transformations we provide form the base on which the
-\texttt{adam-cli} is built. Some important transformations provided by our API include:
+in \citet{zaharia12} as a fault-tolerant abstraction for distributing an array of in-memory data across multiple machines. The API transformations we provide form the base on
+which the \texttt{adam-cli} is built. Some important transformations provided by our API can be found in Table~\ref{tab:api}.
 
-\begin{itemize}
-\item Read data:
-\begin{itemize}
-\item Sort by reference position
-\item Mark Duplicates
-\item BQSR
-\item Realign Indels
-\item Collect reference sequence dictionary
-\item Collect metrics
-\item Translate reads to pileups
-\end{itemize}
-\item Pileup data:
-\begin{itemize}
-\item Aggregate pileup data
-\item Group pileups by reference position
-\item Seperate reference position grouped data by samples
-\item Compute coverage metrics
-\end{itemize}
-\item Genotype data:
-\begin{itemize}
-\item Validate multi-sample genotype data
-\item Compute variant data from genotypes
-\end{itemize}
-\end{itemize}
+\begin{table}[h]
+\processtable{Transformations Provided By API\label{tab:api}}
+{\begin{tabular}{ l l }
+\toprule
+\bf Datatype & \bf Transformations \\
+\midrule
+\bf Read Data & Sort by reference position \\
+ & Mark Duplicates \\
+ & BQSR \\
+ & Realign Indels \\
+ & Collect reference sequence dictionary \\
+ & Collect metrics \\
+ & Translate reads to pileups \\
+ & \\
+\bf Pileup Data & Aggregate pileup data \\
+ & Group pileups by reference position \\
+ & Seperate reference position grouped data by samples \\
+ & Compute coverage metrics \\
+ & \\
+\bf Genotype Data & Validate multi-sample genotype data \\
+ & Compute variant data from genotypes \\
+\botrule
+\end{tabular}}{}
+\end{table}
 
-Additionally, our API provides several enriched datatypes that provide better access semantics for developers. These enriched types include:
+Additionally, our API provides several enriched datatypes that provide better access semantics for developers. These enriched types are depicted in Table~\ref{tab:enriched}.
 
-\begin{itemize}
-\item \textit{ADAMVariantContext}, a type which unifies variant, genotype, and annotation data;
-\item \textit{RichADAMRecord}, a wrapper around ADAMRecords that converts some fields into richer record types (e.g. CIGAR/MD strings);
-\item \textit{ADAMRod}, a type that wraps pileup bases at a single locus position;
-\item \textit{MdTag}s, an enriched class for accessing alignment mismatch data; and,
-\item \textit{ReferencePosition}, \textit{ReferencePositionPair}, and \textit{ReferenceRegion}, which are helper classes that provide rich semantics for describing the relationship
-between an object and it's location on the reference genome.
-\end{itemize}
+\begin{table}[h]
+\processtable{Enriched Datatypes Provided By API\label{tab:enriched}}
+{\begin{tabular}{ p{2.5cm} p{5.5cm} }
+\toprule
+\bf Datatype & \bf Description \\
+\midrule
+\textit{ADAMVariantContext} & Unifies variant, genotype, and annotation data \\
+ & \\
+\textit{RichADAMRecord} & A wrapper around ADAMRecords that converts some fields into richer record types (e.g. CIGAR/MD strings) \\
+ & \\
+\textit{ADAMRod} & Wraps pileup bases at a single locus position \\
+ & \\
+\textit{MdTag} & An enriched class for accessing alignment mismatch data \\
+ & \\
+\textit{ReferencePosition}, \textit{ReferencePositionPair}, \textit{ReferenceRegion} & Helper classes that provide rich semantics for describing the relationship
+between an object and it's location on the reference genome. \\
+\botrule
+\end{tabular}}{}
+\end{table}
 
 The \texttt{adam-core} API also provides partitioners for reference-aligned data. These partitioners work with the Spark map-reduce framework to efficiently co-locate data that
 has spatial locality. This improves the performance of applications that operate on data with high spatial locality by improving the likelihood that two objects that have high
@@ -418,57 +445,112 @@ locality on the reference genome will be on the same machine. This reduces the a
 \subsection{Performance}
 \label{sec:performance}
 
-Table~\ref{tab:overview} previews the performance of ADAM for \textit{Sort} and \textit{Mark Duplicates}.
+Table~\ref{tab:overview} previews the performance of ADAM for \textit{Sort}, \textit{Mark Duplicates}, and \textit{Flagstat}. The tests in this table are run on
+the high coverage \textit{NA12878} full genome BAM file that is available from the 1000 Genomes project\footnote{The file used for these experiments can be found on the
+1000 Genomes ftp site, \url{ftp.1000genomes.ebi.ac.uk} in directory \texttt{/vol1/ftp/data/HG00096/alignment/}.}. These tests have been run on the EC2 cloud, using the instance
+times listed. We have computed the cost of running each experiment by multiplying the number of instances used by the total wall time for the run and by the cost of running
+a single instance of that type for an hour. This is the process used by Amazon to charge customers.
 
 \begin{table}[h]
-\processtable{\textit{Sort} and \textit{Mark Duplicates} Performance on NA12878\label{tab:overview}}
-{\begin{tabular}{ l c c }
+\processtable{\textit{Sort}, \textit{Mark Duplicates}, and \textit{Flagstat} Performance on NA12878\label{tab:overview}}
+{\begin{tabular}{ l c c c c }
 \toprule
-\bf Software & \bf EC2 profile & \bf Wall Clock Time \\
+\multicolumn{5}{c}{\bf \textit{Sort}} \\
+\bf Software & \bf EC2 profile & \bf Wall Time & \bf Speedup & \bf Cost \\
 \midrule
-Picard 1.103 & 1 \texttt{hs1.8xlarge} & 17h 44m \\
-ADAM 0.5.0 & 1 \texttt{hs1.8xlarge} & 8h 56m \\
-ADAM 0.5.0 & 32 \texttt{cr1.8xlarge} & 33m \\
-ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 21m \\ 
+Picard 1.103 & 1 \texttt{hs1.8xlarge} & 17h 44m & 1$\times$ & \$81.57 \\
+ADAM 0.5.0 & 1 \texttt{hs1.8xlarge} & 8h 56m & 2$\times$ & \$41.09 \\
+ADAM 0.5.0 & 32 \texttt{cr1.8xlarge} & 33m & 32$\times$ & \$61.60 \\
+ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 21m & 52$\times$ & \$56.00 \\ 
 \midrule
-\bf Software & \bf EC2 profile & \bf Wall Clock Time \\
+\multicolumn{5}{c}{\bf \textit{Mark Duplicates}} \\
+\bf Software & \bf EC2 profile & \bf Wall Time & \bf Speedup & \bf Cost  \\
 \midrule
-Picard 1.103 & 1 \texttt{hs1.8xlarge} & 20h 22m \\
-ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 29m \\
+Picard 1.103 & 1 \texttt{hs1.8xlarge} & 20h 22m & 1$\times$ & \$93.68 \\
+ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 29m & 42$\times$ & \$79.26 \\
+\midrule
+\multicolumn{5}{c}{\bf \textit{Flagstat}} \\
+\bf Software & \bf EC2 profile & \bf Wall Time & \bf Speedup & \bf Cost  \\
+\midrule
+SAMtools 0.1.19 & 1 \texttt{hs1.8xlarge} & 25m 24s & 1$\times$ & \$1.95 \\
+ADAM 0.5.0 & ??? & 0m 46s & 33$\times$ & ??? \\
 \botrule
 \end{tabular}}{}
 \end{table}
 
+A description of the instance types can be found in Table~\ref{tab:machines}. Memory capacity is reported in Gibibytes~(GiB), where 1 GiB is equal to $2^{30}$ bytes. Storage
+capacities are not reported in this table, but the number and type of storage drives is reported. This is because disk capacity does not impact performance, but aggregate
+disk bandwidth impacts performance. In our tests, the \texttt{hs1.8xlarge} instance is chosen to represent a workstation. Network bandwidth is constant across all instances.
+
+\begin{table}[h]
+\processtable{AWS Machine Types\label{tab:machines}}
+{\begin{tabular}{ l c l }
+\toprule
+\bf Machine & \bf Cost & \bf Description \\
+\midrule
+\texttt{hs1.8xlarge} & \$4.60/hr/machine & 16 cores, 117GiB RAM, 24$\times$ HDD \\
+\texttt{cr1.8xlarge} & \$3.50/hr/machine & 32 cores, 244GiB RAM, 2$\times$ SDD \\
+\texttt{m2.4xlarge} & \$1.64/hr/machine & 8 cores, 68.4GiB RAM, 2$\times$ HDD \\
+\botrule
+\end{tabular}}{}
+\end{table}
+
+As can be seen from these results, the ADAM pipeline is approximately twice as fast as current pipelines when running on a single node. Additionally, ADAM achieves
+speedup that is close to linear. Speedup is limited by several factors:
+
+\begin{itemize}
+\item Although columnar stores have very high read performance, they are limited by write performance. Our tests exaggerate this penalty---as a variant calling pipeline will
+consume a large read file, but then output a variant call file that is approximately two orders of magnitude smaller, the write penalty will be reduced.
+\item Additionally, for large clusters, straggler elimination is an issue. Phases of both \textit{Sort} and \textit{MarkDuplicates} currently suffer from stragglers---we are in
+the process of addressing these issues.
+\end{itemize}
+
+\textbf{Insert speedup graphs from Mt. Sinai here when available}
+
 \section{Discussion}
 \label{sec:discussion}
+
+As a quick reference, Table~\ref{tab:comparison} compares ADAM's read and variant/genotype formats against the BAM and VCF formats.
 
 \begin{table}[h]
 \processtable{Comparison of File Formats\label{tab:comparison}}
 {\begin{tabular}{ l c c }
 \toprule
+ & \bf BAM \& VCF & \bf ADAM \\
+\midrule
+\bf Scalability & $\le$8 machines & $>$100 machines \\
+\bf Global Information & Centralized header & Store in all records \\
+\bf Cross Platform Support & Implemented via API & Direct record access \\
+\midrule
  & \bf BAM & \bf ADAM \\
 \midrule
 \bf Size & 1.0$\times$ & 0.75-0.9$\times$ \\
-\bf Scalability & $<$8 machines & $>$100 machines \\
+\bf Can Query? & Add-on~(GQL) & Natively supported \\ 
 \midrule
 & \bf VCF & \bf ADAM \\
 \midrule
-\bf Scalability & $<$8 machines & $>$100 machines \\
+\bf Can Query? & No & Natively supported \\ 
+\bf Access subset of samples? & No & Natively supported \\
+\bf Annotation Support & Only variant/genotype & User specified \\
 \botrule
 \end{tabular}}{}
 \end{table}
+
+In the remainder of this section, we discuss the evolution of ADAM. First, we discuss how we envision the computing systems that are used in bioinformatics to evolve, and
+how ADAM enables this evolution. Finally, we discuss the design decisions and processes that we have incorporated that will make it easy to revise the ADAM data formats.
 
 \subsection{Single Node Processing vs. Dedicated Clusters vs. Cloud Computing}
 \label{sec:single-vs-clusters-vs-cloud}
 
 A central goal during the development of ADAM was to not force users to follow specific patterns. As such, we have also made efforts to design the ADAM format and command
 line utilities to be portable across different computing installations. We envision that end users will be using ADAM on single workstations, dedicated computing
-clusters, or through a cloud computing provider like Amazon EC2 or Microsoft Azure. As can be seen in~\S\ref{sec:performance}, ADAM performs admirably on all platforms,
-achieving a 2$\times$ speedup over the current state-of-the-art on a single node, and near-linear speedup on when distributed.
+clusters, or through a cloud computing provider like Amazon EC2, Google Compute Engine, or Microsoft Azure. As can be seen in~\S\ref{sec:performance}, ADAM performs
+admirably on all platforms, achieving a 2$\times$ speedup over the current state-of-the-art on a single node, and near-linear speedup on when distributed.
 
 As traditional genomics workflows could not easily or efficiently use compute clusters, many users have performed the bulk of their processing on beefy workstations. We predict
 that the rise of distributed computing tools for genomics will soon render workstations unattractive. Instead, we expect that clinical/research centers will either process
-consistently high volumes of genomic data and build and maintain their own dedicated compute farms, or will use a cloud computing platform. The benefits of cloud computing:
+consistently high volumes of genomic data and build and maintain their own dedicated compute farms, or will use a cloud computing platform for infrequent data processing
+needs. The benefits of cloud computing:
 
 \begin{itemize}
 \item Commercial cloud platforms are economically attractive as they do not present any capital acquisition costs, nor do they have maintenance costs.
