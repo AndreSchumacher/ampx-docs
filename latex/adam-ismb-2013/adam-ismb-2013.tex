@@ -5,7 +5,7 @@
 \pubyear{2014}
 \usepackage{url}
 
-\newcommand{\todo}[1]{\footnote{#1}}
+\newcommand{\todo}[1]{\footnote{\textbf{TODO:} #1}}
  
 \begin{document}
 \firstpage{1}
@@ -51,12 +51,11 @@ and the source is available through GitHub.
 
 The Sequence/Binary Alignment/Map~(SAM/BAM) and Variant Call Format~(VCF) file formats were designed before multi-node processing and cloud computing were
 in vogue---thusly, they were designed for single node processing~\citep{li09}. As noted by \citet{mcpherson09}, as next generation sequencing~(NGS) methods continue
-to improve, the latency of alignment and variant calling is becoming increasingly costly for scientists who are using genomics in a clinical setting, or who are working on
-very large datasets for genome wide association studies~(GWAS, see~\citet{wang05})\todo{This sentence seems quite complicated and ''as'' is repeated. Could it be simplified?}. To address this issue, it is desirable to be able to compute on genomic data across
-many machines, but characteristics of the BAM and VCF file formats practically limit scalability to 8 nodes~\citep{niemenmaa12}.
+to improve, the cost of data processing is increasing. This is costly for scientists who are using genomics in a clinical setting, or who are working on very large datasets for
+genome wide association studies~(GWAS, see~\citet{wang05}). To address this issue, it is desirable to be able to compute on genomic data across many machines, but
+characteristics of the BAM and VCF file formats practically limit scalability to 8 nodes~\citep{niemenmaa12}.
 
-The scalability limitations are inherent to the file formats, as we discuss in more detail in \S\ref{sec:approach}.
-We choose to rethink file formats for genomics
+The scalability limitations are inherent to the BAM and VCF file formats, as we discuss in more detail in~\S\ref{sec:approach}. We choose to rethink file formats for genomics
 using the benefit of experience and hindsight, instead of looking to incrementally improve either BAM or VCF. Our approach is guided by the following design questions:
 
 \begin{itemize}
@@ -69,7 +68,9 @@ and using cloud computing services. How can we jointly optimize for these divers
 way to support this extensibility than attribute maps?
 \end{itemize}
 
-\todo{Instead of formulating these as (research?) questions, which is a bit artificial, it would seem stronger to formulate them as design goals.}
+\todo{Instead of formulating these as (research?) questions, which is a bit artificial, it would seem stronger to formulate them as design goals. \textbf{FAN:} I think that they
+need to be formulated as questions $\rightarrow$ the most difficult part of this work is getting people to accept that BAM/VCF need to be replaced. By ``asking'' these questions,
+we usher the reader down our line of reasoning.}
 
 To address these problems, we introduce ADAM, a set of formats, application programming interfaces~(APIs), and processing stage
 implementations for genomic data. ADAM is fully open source under the Apache 2 license, and is implemented on top of Avro~\citep{avro}
@@ -200,8 +201,7 @@ framework~\citep{avro, parquet, zaharia10}. We have already explained the reason
 \paragraph{Spark, In-Memory Map-Reduce:}
 \label{sec:spark}
 
-Apache Spark is an in-memory, distributed Map-Reduce framework that was introduced in \citet{zaharia10} and further described in \citet{zaharia12}.\todo{Do we
-need both references?}
+Apache Spark is an in-memory, distributed Map-Reduce framework that was introduced in \citet{zaharia10} and further described in \citet{zaharia12}.
 Although it is compatible with the Hadoop~\citep{hadoop} ecosystem, Spark differs from conventional implementations of the Map-Reduce framework
 originally proposed by Google in~\citep{dean08}, since it avoids writing data to disk whenever possible and instead caches
 data in memory. This provides a dramatic speedup for iterative computations---Spark sees a 30--100$\times$ speedup on iterative jobs by eliminating
@@ -223,8 +223,8 @@ be available in the first half of 2014.}.
 \label{sec:parquet}
 
 Parquet is a columnar file format that is designed for distributed computing. Columnar stores differ from conventional file formats as they group data together
-by field instead of by record\footnote{In other words, all values for a single field are stored sequentially on disk.}. This orientation enables very high read performance, improved
-compression~\citep[see][]{abadi06}, and the efficient serialization of a subset of fields. Parquet has other benefits:
+by field instead of by record. This orientation enables very high read performance, improved compression~\citep[see][]{abadi06}, and the efficient serialization of a subset
+of fields. Parquet has other benefits:
 
 \begin{itemize}
 \item Parquet operates by splitting a single ``file'' into many smaller files that contain \emph{row groups}\footnote{In Parquet, a \emph{row group} contains a subset
@@ -283,7 +283,7 @@ The data types presented in this section make up the narrow waist of our propose
 
 We do not provide a full description of all fields in our standard in this paper---a full description of the fields of the data types is available in the ADAM technical
 report~\citep[see][\S5]{massie13}. We note that the internal representations of the data may change at any point in time---for the most up to date schema, we refer readers
-to the ADAM repository.\todo{Note: there should be some notion of how users deal with changes in format (backward compatibility, default values?)!}
+to the ADAM repository. The format is designed to gracefully evolve---this issue is discussed in more detail in~\S\ref{sec:evolution-of-standard}.
 
 We next discuss novel details of our format implementation, and contrast the structure of our formats against the current BAM and VCF formats. 
 
@@ -561,7 +561,7 @@ admirably on all platforms, achieving a 2$\times$ speedup over the current state
 As traditional genomics workflows could not easily or efficiently use compute clusters, many users have performed the bulk of their processing on beefy workstations. We predict
 that the rise of distributed computing tools for genomics will soon render workstations unattractive. Instead, we expect that clinical/research centers will either process
 consistently high volumes of genomic data and build and maintain their own dedicated compute farms, or will use a cloud computing platform for infrequent data processing
-needs. The benefits of cloud computing:
+needs. The benefits of cloud computing include:
 
 \begin{itemize}
 \item Commercial cloud platforms are economically attractive as they do not present any capital acquisition costs, nor do they have maintenance costs.
@@ -590,7 +590,7 @@ organization.
 ADAM is a community effort, and all members of the greater bioinformatics community are invited to modify both the data formats and the processing pipelines. The ADAM team
 has established a Request For Comment~(RFC) system that is similar to the one used by the Internet Engineering Task Force~(IETF). Here, modifications are proposed and
 opened for public discussion for a set time frame. After a consensus is reached, the format can be amended. The RFC platform is hosted at our project
-website\footnote{\url{http://adam.cs.berkeley.edu/rfc}}.
+website~(\url{http://adam.cs.berkeley.edu/rfc}).
 
 \section{Conclusion}
 \label{sec:conclusion}
