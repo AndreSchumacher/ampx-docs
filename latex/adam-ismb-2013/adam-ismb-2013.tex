@@ -84,7 +84,8 @@ Avro, a cross-platform/language serialization format. This provides native acces
 This eliminates the possibility of library incompatibilities and reduces the likelihood of programming errors. Additionally, any application that implements the
 ADAM schema is compatible with ADAM. This allows for a greater variety of access patterns and programming models to be built on top of ADAM. The ADAM stack is inspired
 by the ``narrow waist'' of the Internet Protocol~(IP) suite (see Figure~\ref{fig:stack-model}). We consider this stack model to be the greatest contribution of ADAM, as it ensures
-that the basic ADAM file formats can easily be optimized for new computing technologies.
+that the basic ADAM file formats can easily be optimized for new computing technologies. While the base abstraction provided by ADAM focuses on the syntax of data
+interchange, the stack design allows for semantics that better represent the biology to be implemented on ADAM.
 
 In this paper, we introduce our new approach in~\S\ref{sec:approach}, and explain the benefits it provides. We review the design and performance of our pipeline
 in~\S\ref{sec:methods}. Finally, we provide a comprehensive comparison of ADAM against other data formats and discuss the future growth of ADAM in~\S\ref{sec:discussion}.
@@ -581,6 +582,19 @@ machines can be selected. Additionally, cloud platforms also frequently auction 
 
 We anticipate that formats like ADAM will ease this transition, as ADAM can be used efficiently on all platforms. Additionally, ADAM's stack model explicitly allows for significant
 flexibility in the format. This will allow ADAM to easily adapt to any future computing revolutions.
+
+\subsection{Syntax vs. Semantics}
+\label{sec:syntax-vs-semantics}
+
+When developing a new genomics file format, it is important to address both the problems of syntax and semantics. A format that is \emph{syntactically good} will be easily
+adaptable to multiple platforms, provide good programming abstractions and APIs, and will be performant. A format that is \emph{semantically good} will provide data
+representations that closely mirror the biological and algorithmic processes they represent.
+
+The core of the ADAM project is focused on improving the syntax used for representing biological data. Our focus on semantics is limited to introducing semantic improvements
+for variant and genotype data that allows for better representation of joint called data and annotations~\S\ref{sec:adamvariant}. However, while we do not address the greater
+issues of semantics, we provide a clean platform for tacking these issues. This is because of the ADAM stack and its ability to support broader access and computational patterns.
+For example, ADAM data can easily be accessed using relational databases like Shark and Impala~\citep{xin13shark, impala}. Additionally, ADAM can be used as the base
+of a graph-based data representation through GraphX~\citep{xin13graphx}. This design decision allows for the easy and clean extension of ADAM's semantics.
 
 \subsection{Evolution of Standard}
 \label{sec:evolution-of-standard}
