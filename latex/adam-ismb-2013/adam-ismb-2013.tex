@@ -30,14 +30,14 @@ $^{5}$Carl Icahn School of Medicine at Mount Sinai, New York, NY}
 \begin{abstract}
 
 \section{Motivation:}
-Current genomics data formats and processing pipelines are not designed to process large datasets quickly. As the quantity of genetic data continues to increase, it is 
-desirable to be able to process this data using very large clusters or via cloud computing. We introduce a new set of language-independent file formats that are designed for
-cluster and cloud computing as a potential successor to the BAM and VCF standards.
+By using cloud computing services or large computing clusters to process genomic data, we can significantly decrease the cost and latency of genomic analysis. However,
+current genomics data formats and processing pipelines were introduced prior to many significant advances in cloud and cluster computing technologies. Through the careful
+design of new file formats, we can unlock the advantages of distributed computing and also ensure that the file formats can easily be optimized for future computing advances.
 
-\section{Results:} We propose ADAM, which is a set of file formats and command line tools for processing genome data on clusters and in the cloud. On a high coverage~(60$\times$) 250GB
-NA12878 BAM file, with ADAM we are able to perform Sorting and Duplicate Marking in under 50 minutes on a 100 node
-cloud-based cluster~(a 50$\times$ performance improvement). On a single node, our tools performs twice as fast as Picard and SAMtools. ADAM files are up to 25\%
-smaller than equivalent compressed BAM files.
+\section{Results:} We introduce ADAM, a set of file formats and command line tools for processing genome data on clusters and in the cloud. On a high coverage~(60$\times$)
+250GB NA12878 BAM file, with ADAM we are able to perform Sorting and Duplicate Marking in under 50 minutes on a 100 node cloud-based cluster~(a 50$\times$
+performance improvement). On a single node, our tools performs twice as fast as Picard and SAMtools, at half the cost. ADAM files are up to 25\% smaller than equivalent
+compressed BAM files.
 
 \section{Availability:}
 The ADAM project website is at \url{http://adam.cs.berkeley.edu}. ADAM is open source under the Apache 2 license, is deployed through Maven,
@@ -49,54 +49,45 @@ and the source is available through GitHub.
 \section{Introduction}
 \label{sec:introduction}
 
-The Sequence/Binary Alignment/Map~(SAM/BAM) and Variant Call Format~(VCF) file formats were designed before multi-node processing and cloud computing were
-in vogue---thusly, they were designed for single node processing~\citep{li09}. As noted by \citet{mcpherson09}, as next generation sequencing~(NGS) methods continue
-to improve, the cost of data processing is increasing. This is costly for scientists who are using genomics in a clinical setting, or who are working on very large datasets for
-genome wide association studies~(GWAS, see~\citet{wang05}). To address this issue, it is desirable to be able to compute on genomic data across many machines, but
-characteristics of the BAM and VCF file formats practically limit scalability to 8 nodes~\citep{niemenmaa12}.
+As noted by \citet{mcpherson09}, as next generation sequencing~(NGS) methods continue to improve, data processing has become a bottleneck. This issue has significant
+impact on scientists who are using genomics in a time-sensitive clinical setting, or who are working on very large datasets~(e.g., for genome wide association studies, GWAS,
+see~\citet{wang05}). The Sequence/Binary Alignment/Map~(SAM/BAM) and Variant Call Format~(VCF) file formats were designed before multi-node processing and cloud
+computing were in vogue, and were optimized for single node processing~\citep{li09}. However, the past five years have seen significant improvements in both hardware
+and software for distributed computing~\citep{barroso13}.
 
-The scalability limitations are inherent to the BAM and VCF file formats, as we discuss in more detail in~\S\ref{sec:approach}. We choose to rethink file formats for genomics
-using the benefit of experience and hindsight, instead of looking to incrementally improve either BAM or VCF. Our approach is guided by the following design questions:
+To improve both the cost and latency of genomic processing, it is desirable to perform this processing across many machines. However, there are scalability limitations inherent
+to the BAM and VCF file formats that limit the performance improvements seen by using more than 8 nodes This limitation is seen in \citet{niemenmaa12} and is discussed in
+more detail in ~\S\ref{sec:approach}. We choose to rethink file formats for genomics to unlock the advantages of distributed computing platforms, and to enable easy adjustment
+to future computing trends. We are guided by the following design goals:
 
 \begin{itemize}
-\item BAM and VCF optimize for row-oriented, flat file access. Is this access pattern the best pattern for genomics?
-\item Scientists collectively want to process data in several different programming languages. How can we avoid incompatibilities between
-data processed using different languages or libraries?
+\item Many genomics applications only access selective portions of data~(certain groups of records, or fields within records). Our new formats should support these access
+patterns when used as a flat file, and also when used as a database.
+\item Scientists collectively want to process data in several different programming languages. To avoid incompatibilities, it is important that our new formats are natively
+supported across many programming languages.
 \item Genomic data will be processed on various computing systems, including single workstations, large dedicated clusters,
-and using cloud computing services. How can we jointly optimize for these diverse platforms?
-\item The file formats we use must be flexible enough to support new fields, but should not become unmanageable. Is there a better
-way to support this extensibility than attribute maps?
+and using cloud computing services. We must jointly optimize for these diverse platforms.
+\item The file formats we use must be flexible enough to support new fields, but should be straightforward to manage and maintain.
 \end{itemize}
 
-\todo{Instead of formulating these as (research?) questions, which is a bit artificial, it would seem stronger to formulate them as design goals. \textbf{FAN:} I think that they
-need to be formulated as questions $\rightarrow$ the most difficult part of this work is getting people to accept that BAM/VCF need to be replaced. By ``asking'' these questions,
-we usher the reader down our line of reasoning.}
-
-To address these problems, we introduce ADAM, a set of formats, application programming interfaces~(APIs), and processing stage
-implementations for genomic data. ADAM is fully open source under the Apache 2 license, and is implemented on top of Avro~\citep{avro}
-and Parquet~\citep{parquet} for data storage. Our reference pipeline is implemented on top of Spark, a high performance in-memory Map-Reduce
-system~\citep{zaharia10}. This combination provides the following advantages:
-
-\begin{itemize}
-\item Avro provides an explicit data schema, which enables fully compatible accesses in C/C++/C\#, Java/Scala, Python, php, and Ruby;
-\item Parquet allows efficient distributed access and use by database systems like Impala and Shark; and 
-\item Spark improves performance through in-memory caching and reducing disk I/O.
-\end{itemize}
-
-These changes lead to significant performance improvements, and improve the format's cross-platform portability. On a single
+To address these problems, we introduce ADAM, a set of formats, application programming interfaces~(APIs), and processing stage implementations for genomic data.
+ADAM is fully open source under the Apache 2 license, and is implemented on top of Avro~\citep{avro} and Parquet~\citep{parquet} for data storage. Our reference pipeline
+is implemented on top of Spark, a high performance in-memory Map-Reduce system~\citep{zaharia10}. This combination provides an explicit data schema, which enables
+natively compatible file access across many programming languages, improves the scalability of distributed applications, and reduces the disk I/O bottleneck faced by many
+contemporary genomics applications. These changes lead to significant performance improvements, and improve the format's cross-platform portability. On a single
 node, we are able to speedup sort and duplicate marking by 2$\times$. More importantly, on a 250 Gigabyte~(GB) high~(60$\times$) coverage
 human genome, this system achieves a 50$\times$ speedup on a 100 node computing cluster, fulfilling the promise of scalability of ADAM.
 We provide an extensive review of ADAM's performance in~\S\ref{sec:performance}.
 
-The ADAM format provides explicit schemas for read and reference oriented~(pileup) sequence data, variants, and genotypes. As the schemas are implemented in Apache
-Avro---a cross-platform/language serialization format---they eliminate the need for the development of language-specific libraries for format decoding/encoding, which
-eliminates the possibility of library incompatibilities and---more importantly---reduces the likelihood of programming errors. Additionally, any application that implements the ADAM schema is
-compatible with ADAM. This prevents applications from being locked into a specific tool or pattern. The ADAM stack is inspired by the ``narrow waist'' of the Internet
-Protocol~(IP) suite (see Figure~\ref{fig:stack-model}). We consider this stack model to be the greatest contribution of ADAM.
+The ADAM format provides explicit schemas for read and reference oriented~(pileup) sequence data, variants, and genotypes. The schemas are implemented in Apache
+Avro, a cross-platform/language serialization format. This provides native access to ADAM data across languages, without requiring the development of APIs or libraries.
+This eliminates the possibility of library incompatibilities and reduces the likelihood of programming errors. Additionally, any application that implements the
+ADAM schema is compatible with ADAM. This allows for a greater variety of access patterns and programming models to be built on top of ADAM. The ADAM stack is inspired
+by the ``narrow waist'' of the Internet Protocol~(IP) suite (see Figure~\ref{fig:stack-model}). We consider this stack model to be the greatest contribution of ADAM, as it ensures
+that the basic ADAM file formats can easily be optimized for new computing technologies.
 
-In this paper, we start by discussing why a new approach is necessary, and what our new approach is in~\S\ref{sec:approach}. We review the
-design and performance of our pipeline in~\S\ref{sec:methods}. Finally, we provide a comprehensive comparison of
-ADAM against other data formats and discuss the future growth of ADAM in~\S\ref{sec:discussion}.
+In this paper, we introduce our new approach in~\S\ref{sec:approach}, and explain the benefits it provides. We review the design and performance of our pipeline
+in~\S\ref{sec:methods}. Finally, we provide a comprehensive comparison of ADAM against other data formats and discuss the future growth of ADAM in~\S\ref{sec:discussion}.
 
 \section{Approach}
 \label{sec:approach}
