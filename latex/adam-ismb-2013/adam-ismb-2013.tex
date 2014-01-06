@@ -11,10 +11,10 @@
 \firstpage{1}
 
 \title[ADAM: Cloud Scale Genomic Processing]{ADAM: A Data Format And Pipeline For Cloud Scale Genomic Processing}
-\author[Massie \textit{et~al}]{Matt~Massie\,$^{1,*}$, Frank~Austin~Nothaft\,$^{1,*}$, Christopher~Hartl\,$^{2}$, Christos~Kozanitis\,$^1$,
-Andr\'{e}~Schumacher\,$^3$, Timothy~Danford\,$^4$, Carl~Yeksigian\,$^4$, Jey~Kottalam\,$^1$, Arun~Ahuja\,$^5$, Neal~Sidhwaney\,$^5$,
-Jeff~Hammerbacher\,$^5$, Michael Linderman\,$^5$, Anthony~D.~Joseph\,$^1$, and David~Patterson$\,^1$\footnote{to whom correspondence
-should be addressed}}
+\author[Massie and Nothaft \textit{et~al}]{Matt~Massie\,$^{1,\dagger,}$\footnote{These authors contributed equally.} , Frank~Austin~Nothaft\,$^{1,\dagger, *}$,
+Christopher~Hartl\,$^{2}$, Christos~Kozanitis\,$^1$, Andr\'{e}~Schumacher\,$^3$, Timothy~Danford\,$^4$, Carl~Yeksigian\,$^4$, Jey~Kottalam\,$^1$,
+Arun~Ahuja\,$^5$, Neal~Sidhwaney\,$^5$, Jeff~Hammerbacher\,$^5$, Michael Linderman\,$^5$, Anthony~D.~Joseph\,$^1$, and David~Patterson$\,^{1,}$\footnote{To whom
+correspondence should be addressed.}}
 \address{$^{1}$Department of Electrical Engineering and Computer Science, University of California, Berkeley, CA\\
 $^{2}$The Broad Institute of MIT and Harvard, Cambridge, MA\\
 $^{3}$International Computer Science Institute (ICSI), University of California, Berkeley, CA\\
@@ -49,14 +49,14 @@ and the source is available through GitHub.
 \section{Introduction}
 \label{sec:introduction}
 
-As noted by \citet{mcpherson09}, as next generation sequencing~(NGS) methods continue to improve, data processing has become a bottleneck. This issue has significant
+As noted by \citet{mcpherson09}, the improvement of next generation sequencing~(NGS) methods has made data processing a bottleneck. This has significant
 impact on scientists who are using genomics in a time-sensitive clinical setting, or who are working on very large datasets~(e.g., for genome wide association studies, GWAS,
 see~\citet{wang05}). The Sequence/Binary Alignment/Map~(SAM/BAM) and Variant Call Format~(VCF) file formats were designed before multi-node processing and cloud
 computing were in vogue, and were optimized for single node processing~\citep{li09}. However, the past five years have seen significant improvements in both hardware
 and software for distributed computing~\citep{barroso13}.
 
-To improve both the cost and latency of genomic processing, it is desirable to perform this processing across many machines. However, there are scalability limitations inherent
-to the BAM and VCF file formats that limit the performance improvements seen by using more than 8 nodes This limitation is seen in \citet{niemenmaa12} and is discussed in
+Distributed processing can improve both the cost and latency of genomic processing. However, there are scalability limitations inherent to the BAM and VCF file formats that limit
+the performance improvements seen by distributing data over more than 8 nodes. This limitation is seen in \citet{niemenmaa12} and is discussed in
 more detail in ~\S\ref{sec:approach}. We choose to rethink file formats for genomics to unlock the advantages of distributed computing platforms, and to enable easy adjustment
 to future computing trends. We are guided by the following design goals:
 
@@ -72,7 +72,7 @@ and using cloud computing services. We must jointly optimize for these diverse p
 
 To address these problems, we introduce ADAM, a set of formats, application programming interfaces~(APIs), and processing stage implementations for genomic data.
 ADAM is fully open source under the Apache 2 license, and is implemented on top of Avro~\citep{avro} and Parquet~\citep{parquet} for data storage. Our reference pipeline
-is implemented on top of Spark, a high performance in-memory Map-Reduce system~\citep{zaharia10}. This combination provides an explicit data schema, which enables
+is implemented on top of Spark, a high performance in-memory Map-Reduce system~\citep{zaharia10}. This combination provides an explicit data schema, enables
 natively compatible file access across many programming languages, improves the scalability of distributed applications, and reduces the disk I/O bottleneck faced by many
 contemporary genomics applications. These changes lead to significant performance improvements, and improve the format's cross-platform portability. On a single
 node, we are able to speedup sort and duplicate marking by 2$\times$. More importantly, on a 250 Gigabyte~(GB) high~(60$\times$) coverage
@@ -101,9 +101,8 @@ intrinsic to BAM and VCF:
 \item BAM and VCF both have irregular record sizes, which limits the efficiency of row-parallel reading. 
 \end{itemize}
 
-These characteristics limit the performance of applications that desire parallel access to all records of a BAM or VCF file. However,
-this points at another problem: some modern bioinformatics file formats lock users into a single processing platform or technique. There are
-several reasons that traditional flat file formats are not ideal for genomics, such as:
+These characteristics limit the performance of applications that desire parallel access to all records of a BAM or VCF file. However, this points at another problem: traditional
+flat file formats are not ideal for genomics. Traditional flat file formats do not provide:
 
 \begin{itemize}
 \item \textbf{Database Queries:} Extending BAM to support standard database queries required a significant extension~\citep{kozanitis13}.
@@ -123,9 +122,9 @@ of this section, we review our high-level architecture that provides extensibili
 \subsection{Architectural Overview}
 \label{sec:architectural-overview}
 
-The primary takeaway of the criticisms of BAM and VCF are that the formats are difficult to specialize for certain processing patterns without
+Our primary criticisms of BAM and VCF are that the formats are difficult to specialize for certain processing patterns without
 changing the implementation of the formats themselves. This issue is similar to the problems addressed during the development of the Open
-Systems Interconnection~(OSI) model and Internet Protocol~(IP) stack for networking services~\citep{zimmermann80}. Specifically, the developers
+Systems Interconnection~(OSI) model and Internet Protocol~(IP) stack for networking services~\citep{zimmermann80}. The developers
 of the OSI model and the IP stack needed to make many different technologies and systems function in unison---to do this, they introduced the
 concept of a ``narrow waist,'' which guaranteed that a new protocol or technology would be compatible with the rest of the system if it implemented
 one specific interface.
@@ -156,7 +155,7 @@ straightforward methods for querying the characteristics of individual portions 
 \item {\bf Application:} Applications like variant calling and alignment are implemented in this layer.
 \end{enumerate}
 
-The ADAM schema is represented using Apache Avro~\citep{avro}, which is an open-source, cross-platform data serialization framework, similar
+The ADAM schema is represented using Apache Avro~\citep{avro}, an open-source, cross-platform data serialization framework similar
 to Apache Thrift and Google's Protocol Buffers~\citep{thrift, protobuf}. Avro was chosen as the interchange format for several reasons:
 
 \begin{itemize}
@@ -182,7 +181,7 @@ By treating the compute substrate and storage as separate layers, we also drasti
 
 We present a reference implementation of a read processing pipeline~(\texttt{adam-core}). This implementation is fully open source
 and is designed for a distributed, in-memory Map-Reduce framework. We do not optimize for a specific computing platform---rather, we have designed
-agnostically for a commodity cloud computing platform. We discuss this decision in~\S\ref{sec:single-vs-clusters-vs-cloud}. Our reference
+agnostically for commodity clusters and for cloud computing platforms. We discuss this decision in~\S\ref{sec:single-vs-clusters-vs-cloud}. Our reference
 implementation provides several read processing stages that can be either run from a command line, or executed by another application through
 an API, as well as an API for enriched datatypes. These APIs are similar to those provided by SAMtools~\citep{li09} and Picard~\citep{picard}.
 
@@ -194,7 +193,7 @@ framework~\citep{avro, parquet, zaharia10}. We have already explained the reason
 
 Apache Spark is an in-memory, distributed Map-Reduce framework that was introduced in \citet{zaharia10} and further described in \citet{zaharia12}.
 Although it is compatible with the Hadoop~\citep{hadoop} ecosystem, Spark differs from conventional implementations of the Map-Reduce framework
-originally proposed by Google in~\citep{dean08}, since it avoids writing data to disk whenever possible and instead caches
+originally proposed by Google in \citet{dean08}, since it avoids writing data to disk whenever possible and instead caches
 data in memory. This provides a dramatic speedup for iterative computations---Spark sees a 30--100$\times$ speedup on iterative jobs by eliminating
 disk I/O and by improving resource utilization by pipelining computation. This pattern is a good fit for genomics because:
 
@@ -204,7 +203,8 @@ we are able to lessen the disk I/O penalty and improve latency.
 \item Many genomic processing stages are iterative. For many applications, iteration implies that stages can be pipelined, which improves system performance on large
 parallel systems\footnote{Performance is improved as pipelining reduces the number of executors that become idle at the start and end of stages by overlapping the
 two stages.}.
-\item Additionally, memory cost and capacity is improving very quickly. Datacenters are moving towards a model where large ``clouds'' of memory are replacing storage.
+\item Additionally, memory cost and capacity is improving very quickly. Datacenters are moving towards a model where large ``clouds'' of memory are replacing
+storage~\citep{barroso13}.
 \end{itemize}
 
 An additional benefit of Spark is that its programming interface supports Java, Scala, and Python\footnote{A programming interface for the R programming language will
@@ -218,17 +218,16 @@ by field instead of by record. This orientation enables very high read performan
 of fields. Parquet has other benefits:
 
 \begin{itemize}
-\item Parquet operates by splitting a single ``file'' into many smaller files that contain \emph{row groups}\footnote{In Parquet, a \emph{row group} contains a subset
+\item Parquet operates by splitting a single dataset into many smaller files that contain \emph{row groups}\footnote{In Parquet, a \emph{row group} contains a subset
 of rows of data from the dataset. The row groups are then stored in columnar format.}. This division enables both parallelism by column and by row which increases read
 parallelism.
 \item Parquet provides \emph{predicate pushdown}, where user defined filters are applied while records are being read. This feature can lead to a $>$2$\times$ performance increase.
 A detailed analysis of Parquet's predicate pushdown functions for genomics applications can be found in \citet{massie13}.
 \end{itemize}
 
-Figure~\ref{fig:file-format} shows how ADAM in Parquet compares to BAM. We remove the file header from BAM, and instead distribute these values across all of the stored
-records. This dissemination eliminates global information and makes the file much simpler to distribute across machines. This distribution is effectively free in a columnar store,
+Figure~\ref{fig:file-format} shows how ADAM in Parquet compares to BAM. We remove the file header from BAM, and distribute these values across all of the stored
+records. This dissemination eliminates global information and makes the file simple to distribute across machines. This distribution is effectively free in a columnar store,
 as the store just notes that the information is replicated across many reads.
-\todo{There are too many footnotes (no pun intended). These should be limited to where they are absolutely necessary.}
 
 \begin{figure}[h]
 \begin{center}
@@ -251,7 +250,7 @@ Our reference pipeline implementation provides two components:
 \label{sec:methods}
 
 ADAM contains formats for storing read and reference oriented sequence information, and variant/genotype data. The read oriented sequence format is both forward and
-backward compatible with BAM/SAM, and the variant/genotype data is forwards and backwards compatible with VCF. In this section, we discuss the specific data formats
+backward compatible with BAM/SAM, and the variant/genotype data is forward and backward compatible with VCF. In this section, we discuss the specific data formats
 that we provide. Additionally, we describe the \texttt{adam-cli} toolkit and \texttt{adam-core} API which were introduced in~\S\ref{sec:reference-implementation}.
 
 \subsection{Data Format and Schema}
@@ -300,7 +299,7 @@ disambiguates the length of a deletion or insertion.
 \item From the single read base format we provide, read data can be reconstructed losslessly from pileup data.
 \end{itemize}
 
-We do realize that many users are interested in viewing bases through the traditional pileup view. We provide an internal representation~(\textit{ADAMRod}) that provides
+We realize that many users are interested in viewing bases through the traditional pileup view. We provide an internal representation~(\textit{ADAMRod}) that provides
 efficient access to this data.
 
 Additionally, we provide \emph{pileup aggregation}, a technique that is similar to \texttt{ReducedReads}~\citep[see][]{mckenna10}. Pileup aggregation takes all bases that
@@ -333,7 +332,7 @@ Additionally, since annotations are defined through an explicit schema, annotati
 \paragraph{ADAM Sequence Dictionaries:}
 \label{sec:adam-sequence-dictionaries}
 
-\textbf{Timothy, can you write this?}
+\textbf{Timothy, can you write this?} \todo{Tim}
 
 \subsection{Data Transformations}
 \label{sec:data-transformations}
@@ -383,7 +382,7 @@ to ADAMRecords is not listed in Table~\ref{tab:converters}. We are in the proces
 \end{table}
 
 The translations between ADAM and SAM/BAM/VCF use the Hadoop-BAM framework~\citep[see][]{niemenmaa12} to read and write SAM/BAM/VCF data---this allows for these
-translations to be distributed, which accelerates the translations. Similarly, all of the commands that operate on read data can operate on ADAMRecord, SAM, or BAM data;
+translations to be distributed and accelerates the translations. Similarly, all of the commands that operate on read data can operate on ADAMRecord, SAM, or BAM data;
 if SAM or BAM data is provided, it is transformed on-demand into ADAMRecords.
 
 \paragraph{API Transformations:}
@@ -448,10 +447,11 @@ locality on the reference genome will be on the same machine. This reduces the a
 \label{sec:performance}
 
 Table~\ref{tab:overview} previews the performance of ADAM for \textit{Sort}, \textit{Mark Duplicates}, and \textit{Flagstat}. The tests in this table are run on
-the high coverage \textit{NA12878} full genome BAM file that is available from the 1000 Genomes project\footnote{The file used for these experiments can be found on the
-1000 Genomes ftp site, \url{ftp.1000genomes.ebi.ac.uk} in directory \texttt{/vol1/ftp/data/HG00096/alignment/}.}. These tests have been run on the EC2 cloud, using the instance
-times listed. We have computed the cost of running each experiment by multiplying the number of instances used by the total wall time for the run and by the cost of running
-a single instance of that type for an hour. This is the process used by Amazon to charge customers.
+the high coverage \textit{NA12878} full genome BAM file that is available from the 1000 Genomes project; the HG00096 low coverage BAM from 1000 Genomes
+is used later in this section\footnote{The files used for these experiments can be found on the 1000 Genomes ftp site, \url{ftp.1000genomes.ebi.ac.uk} in directory
+\texttt{/vol1/ftp/data/NA12878/high\_coverage\_alignment/} for NA12878, and in directory \texttt{/vol1/ftp/data/HG00096/alignment/} for HG00096.}. These tests have been
+run on the EC2 cloud, using the instance types listed. We have computed the cost of running each experiment by multiplying the number of instances used by the total
+wall time for the run and by the cost of running a single instance of that type for an hour. This is the process used by Amazon to charge customers.
 
 \begin{table}[h]
 \processtable{\textit{Sort}, \textit{Mark Duplicates}, and \textit{Flagstat} Performance on NA12878\label{tab:overview}}
@@ -475,7 +475,7 @@ ADAM 0.5.0 & 100 \texttt{m2.4xlarge} & 29m & 42$\times$ & \$79.26 \\
 \bf Software & \bf EC2 profile & \bf Wall Time & \bf Speedup & \bf Cost  \\
 \midrule
 SAMtools 0.1.19 & 1 \texttt{hs1.8xlarge} & 25m 24s & 1$\times$ & \$1.95 \\
-ADAM 0.5.0 & ??? & 0m 46s & 33$\times$ & ??? \\
+ADAM 0.5.0 & 32 \texttt{cr1.8xlarge} & 0m 46s & 33$\times$ & \$1.43 \\
 \botrule
 \end{tabular}}{}
 \end{table}
@@ -498,7 +498,23 @@ disk bandwidth impacts performance. In our tests, the \texttt{hs1.8xlarge} insta
 \end{table}
 
 As can be seen from these results, the ADAM pipeline is approximately twice as fast as current pipelines when running on a single node. Additionally, ADAM achieves
-speedup that is close to linear. Speedup is limited by several factors:
+speedup that is close to linear. This point is not clear from Table~\ref{tab:overview}, as we change instance types when also changing the number of instances used. To clarify,
+we present speedup plots for the NA12878 high coverage genome and the HG00096 low coverage genome~(16 GB BAM) in Figure~\ref{fig:speedup}. These speedup
+measurements are taken on a dedicated cluster of 82 machines where each machine has 24 Xeon cores, 128GB of RAM, and 12 disks.
+
+\begin{figure}[h]
+\begin{center}
+\includegraphics[width=0.49\linewidth]{graphs/speedup_na12878.pdf}
+\includegraphics[width=0.49\linewidth]{graphs/speedup_hg00096.pdf}
+\end{center}
+\caption{Speedup when running \textit{Sort} and \textit{Mark Duplicates} on NA12878 and HG00096}
+\label{fig:speedup}
+\end{figure}
+
+NA12878 sees linear speedup for both \textit{Sort} and \textit{Mark Duplicates} through 82 nodes. With 82 nodes, it takes 8.8 minutes to sort reads, and 14 minutes to
+mark duplicate reads across the 250GB file. HG00096 is a significantly smaller genome at 16 GB. Although the speedup from sorting diminishes after 16 nodes, duplicate
+marking sees speedup through 64 nodes. With HG00096 on 64 nodes, each machine in the cluster is responsible for processing only 250MB of data. Sorting completes in
+3.3 minutes, and duplicate marking completes in 2.3 minutes. The speedup is limited by several factors:
 
 \begin{itemize}
 \item Although columnar stores have very high read performance, they are limited by write performance. Our tests exaggerate this penalty---as a variant calling pipeline will
@@ -507,7 +523,8 @@ consume a large read file, but then output a variant call file that is approxima
 the process of addressing these issues.
 \end{itemize}
 
-\textbf{Insert speedup graphs from Mt. Sinai here when available}
+However, as noted above, speedup continues until we reach approximately 1GB of data per node for sorting, or 250MB of data per node for duplicate marking. For a high
+coverage whole genome like NA12878, this should theoretically allow speedup through 250 nodes for sorting and 1,000 nodes for duplicate marking.
 
 \section{Discussion}
 \label{sec:discussion}
@@ -547,7 +564,7 @@ how ADAM enables this evolution. Finally, we discuss the design decisions and pr
 A central goal during the development of ADAM was to not force users to follow specific patterns. As such, we have also made efforts to design the ADAM format and command
 line utilities to be portable across different computing installations. We envision that end users will be using ADAM on single workstations, dedicated computing
 clusters, or through a cloud computing provider like Amazon EC2, Google Compute Engine, or Microsoft Azure. As can be seen in~\S\ref{sec:performance}, ADAM performs
-admirably on all platforms, achieving a 2$\times$ speedup over the current state-of-the-art on a single node, and near-linear speedup on when distributed.
+admirably on all platforms, achieving a 2$\times$ speedup over the current state-of-the-art on a single node, and near-linear speedup when distributed.
 
 As traditional genomics workflows could not easily or efficiently use compute clusters, many users have performed the bulk of their processing on beefy workstations. We predict
 that the rise of distributed computing tools for genomics will soon render workstations unattractive. Instead, we expect that clinical/research centers will either process
@@ -557,8 +574,7 @@ needs. The benefits of cloud computing include:
 \begin{itemize}
 \item Commercial cloud platforms are economically attractive as they do not present any capital acquisition costs, nor do they have maintenance costs.
 \item Additionally, cloud platforms tend to offer several levels of service differentiation. Users can trade cost for performance, as the number of machines and performance of
-machines can be selected. Additionally, cloud platforms also frequently auction unused slots off at below-market prices\footnote{For Amazon EC2, these are known as
-\emph{spot instances}.}, which can further reduce costs.
+machines can be selected. Additionally, cloud platforms also frequently auction unused slots off at below-market prices~(\emph{spot instances}, which can further reduce costs.
 \item System setup can be simplified through the use of systems like \textit{Docker}~\citep{docker} for distributing consistent application images.
 \item Inexpensive pay-as-you-go storage solutions are available which provide good performance when used with a cloud service.
 \end{itemize}
