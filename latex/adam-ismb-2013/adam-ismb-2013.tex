@@ -49,7 +49,7 @@ and the source is available through GitHub.
 \section{Introduction}
 \label{sec:introduction}
 
-As noted by \citet{mcpherson09}, the improvement of next generation sequencing~(NGS) methods has made data processing a bottleneck. This has significant
+As noted by \citet{mcpherson09}, the improvement of next generation sequencing~(NGS) methods has made data processing a bottleneck. This impediment has significant
 impact on scientists who are using genomics in a time-sensitive clinical setting, or who are working on very large datasets~(e.g., for genome wide association studies, GWAS,
 see~\citet{wang05}). The Sequence/Binary Alignment/Map~(SAM/BAM) and Variant Call Format~(VCF) file formats were designed before multi-node processing and cloud
 computing were in vogue, and were optimized for single node processing~\citep{li09}. However, the past five years have seen significant improvements in both hardware
@@ -80,9 +80,9 @@ human genome, this system achieves a 50$\times$ speedup on a 100 node computing 
 We provide an extensive review of ADAM's performance in~\S\ref{sec:performance}.
 
 The ADAM format provides explicit schemas for read and reference oriented~(pileup) sequence data, variants, and genotypes. The schemas are implemented in Apache
-Avro, a cross-platform/language serialization format. This provides native access to ADAM data across languages, without requiring the development of APIs or libraries.
-This eliminates the possibility of library incompatibilities and reduces the likelihood of programming errors. Additionally, any application that implements the
-ADAM schema is compatible with ADAM. This allows for a greater variety of access patterns and programming models to be built on top of ADAM. The ADAM stack is inspired
+Avro, a cross-platform/language serialization format. It provides native access to ADAM data across languages, without requiring the development of APIs or libraries.
+This approach eliminates the possibility of library incompatibilities and reduces the likelihood of programming errors. Additionally, any application that implements the
+ADAM schema is compatible with ADAM, which allows for a greater variety of access patterns and programming models to be built on top of ADAM. The ADAM stack is inspired
 by the ``narrow waist'' of the Internet Protocol~(IP) suite (see Figure~\ref{fig:stack-model}). We consider this stack model to be the greatest contribution of ADAM, as it ensures
 that the basic ADAM file formats can easily be optimized for new computing technologies. While the base abstraction provided by ADAM focuses on the syntax of data
 interchange, the stack design allows for semantics that better represent the biology to be implemented on ADAM.
@@ -160,7 +160,7 @@ The ADAM schema is represented using Apache Avro~\citep{avro}, an open-source, c
 to Apache Thrift and Google's Protocol Buffers~\citep{thrift, protobuf}. Avro was chosen as the interchange format for several reasons:
 
 \begin{itemize}
-\item Avro is an open-source framework covered by the Apache 2 license. This means that Avro can be used with both open and closed source software.
+\item Avro is an open-source framework covered by the Apache 2 license, which means that Avro can be used with both open and closed source software.
 \item Avro has broad cross-platform support. Natively, Avro supports C/C++/C\#, Java, Scala, Python, Ruby, and php.
 \item Avro provides a clear and human readable language for explicitly describing the schema of an object~(Avro Description Language, AVDL).
 \item Avro is natively supported by several common Map-Reduce frameworks and database systems.
@@ -195,7 +195,7 @@ framework~\citep{avro, parquet, zaharia10}. We have already explained the reason
 Apache Spark is an in-memory, distributed Map-Reduce framework that was introduced in \citet{zaharia10} and further described in \citet{zaharia12}.
 Although it is compatible with the Hadoop~\citep{hadoop} ecosystem, Spark differs from conventional implementations of the Map-Reduce framework
 originally proposed by Google in \citet{dean08}, since it avoids writing data to disk whenever possible and instead caches
-data in memory. This provides a dramatic speedup for iterative computations---Spark sees a 30--100$\times$ speedup on iterative jobs by eliminating
+data in memory. This optimization provides a dramatic speedup for iterative computations---Spark sees a 30--100$\times$ speedup on iterative jobs by eliminating
 disk I/O and by improving resource utilization by pipelining computation. This pattern is a good fit for genomics because:
 
 \begin{itemize}
@@ -311,8 +311,8 @@ reduction in the amount of data stored that scales approximately as $O(1/coverag
 \label{sec:adamvariant}
 
 ADAM implements genotypes without relying on the context of a variant. An individual ADAMGenotype record describes a called genotype on a single chromosome of a
-sample. The metrics fields of a genotype~(e.g., quality) mirror the metrics fields of the variant type. This enables genotypes to be expressed without the centralized notion
-of a variant---this is useful for data warehousing, where the genotypes of many samples may be gathered. At a later point in time, it may be desirable to collect and distribute
+sample. The metrics fields of a genotype~(e.g., quality) mirror the metrics fields of the variant type, which enables genotypes to be expressed without the centralized notion
+of a variant. This flexibility is useful for data warehousing, where the genotypes of many samples may be gathered. At a later point in time, it may be desirable to collect and distribute
 variant calls for a subset of these samples; this subset may span multiple variant calling runs. By mirroring fields between Genotype and Variant records, we allow ourselves
 to compute variant statistics from a set of genotypes without having access to the raw read data. This transformation is implemented in both the \texttt{adam-cli} and the
 \texttt{adam-core} API.
@@ -345,8 +345,8 @@ We discuss the command line utilities that we provide, and give a brief overview
 \paragraph{Command Line Utilities:}
 \label{sec:command-line-utilities}
 
-The \texttt{adam-cli} suite of command line utilities implements several important features. They include a set of converters which are depicted in Table~\ref{tab:converters},
-and a set of utilities which are described in Table~\ref{tab:utilities}.
+The \texttt{adam-cli} suite of command line utilities implements several important features. Table~\ref{tab:converters} lists a set of converters
+and Table~\ref{tab:utilities} shows a set of utilities.
 
 \begin{table}[h]
 \processtable{Command Line Format Converters\label{tab:converters}}
@@ -363,7 +363,7 @@ ADAMRecord & $\rightarrow$ & SAMtools style pileups \\
 \end{table}
 
 As is noted in~\S\ref{sec:adampileup}, our pileup format allows for read data to be reassembled from pileups. However, readers may note that a converter from ADAMPileups
-to ADAMRecords is not listed in Table~\ref{tab:converters}. We are in the process of adding this converter to the \texttt{adam-cli} toolbox.
+to ADAMRecords is not in Table~\ref{tab:converters}. We are in the process of adding this converter to the \texttt{adam-cli} toolbox.
 
 \begin{table}[h]
 \processtable{Command Line Utilities\label{tab:utilities}}
@@ -391,7 +391,7 @@ if SAM or BAM data is provided, it is transformed on-demand into ADAMRecords.
 
 The \texttt{adam-core} API provides an extensive set of transformations that are performed on data stored in Resilient Distributed Dataset~(RDD) form. RDDs were introduced
 in \citet{zaharia12} as a fault-tolerant abstraction for distributing an array of in-memory data across multiple machines. The API transformations we provide form the base on
-which the \texttt{adam-cli} is built. Some important transformations provided by our API can be found in Table~\ref{tab:api}.
+which the \texttt{adam-cli} is built. Table~\ref{tab:api} shows some important transformations provided by our API.
 
 \begin{table}[h]
 \processtable{Transformations Provided By API\label{tab:api}}
@@ -418,7 +418,7 @@ which the \texttt{adam-cli} is built. Some important transformations provided by
 \end{tabular}}{}
 \end{table}
 
-Additionally, our API provides several enriched datatypes that provide better access semantics for developers. These enriched types are depicted in Table~\ref{tab:enriched}.
+Additionally, our API provides several enriched datatypes that provide better access semantics for developers. Table~\ref{tab:enriched} shows these enriched types.
 
 \begin{table}[h]
 \processtable{Enriched Datatypes Provided By API\label{tab:enriched}}
@@ -441,8 +441,8 @@ between an object and it's location on the reference genome. \\
 \end{table}
 
 The \texttt{adam-core} API also provides partitioners for reference-aligned data. These partitioners work with the Spark Map-Reduce framework to efficiently co-locate data that
-has spatial locality. This improves the performance of applications that operate on data with high spatial locality by improving the likelihood that two objects that have high
-locality on the reference genome will be on the same machine. This reduces the amount of data that must be fetched across the network when performing distributed computing.
+has spatial locality. This proximity improves the performance of applications that operate on data with high spatial locality by improving the likelihood that two objects that have high
+locality on the reference genome will be on the same machine. This assignment reduces the amount of data that must be fetched across the network when performing distributed computing.
 
 \subsection{Performance}
 \label{sec:performance}
@@ -451,8 +451,8 @@ Table~\ref{tab:overview} previews the performance of ADAM for \textit{Sort}, \te
 the high coverage \textit{NA12878} full genome BAM file that is available from the 1000 Genomes project; the HG00096 low coverage BAM from 1000 Genomes
 is used later in this section\footnote{The files used for these experiments can be found on the 1000 Genomes ftp site, \url{ftp.1000genomes.ebi.ac.uk} in directory
 \texttt{/vol1/ftp/data/NA12878/high\_coverage\_alignment/} for NA12878, and in directory \texttt{/vol1/ftp/data/HG00096/alignment/} for HG00096.}. These tests have been
-run on the EC2 cloud, using the instance types listed. We have computed the cost of running each experiment by multiplying the number of instances used by the total
-wall time for the run and by the cost of running a single instance of that type for an hour. This is the process used by Amazon to charge customers.
+run on the EC2 cloud, using the instance types listed. We compute the cost of running each experiment by multiplying the number of instances used by the total
+wall time for the run and by the cost of running a single instance of that type for an hour, which is the process Amazon uses to charge customers.
 
 \begin{table}[h]
 \processtable{\textit{Sort}, \textit{Mark Duplicates}, and \textit{Flagstat} Performance on NA12878\label{tab:overview}}
@@ -481,9 +481,9 @@ ADAM 0.5.0 & 32 \texttt{cr1.8xlarge} & 0m 46s & 33$\times$ & \$1.43 \\
 \end{tabular}}{}
 \end{table}
 
-A description of the instance types can be found in Table~\ref{tab:machines}. Memory capacity is reported in Gibibytes~(GiB), where 1 GiB is equal to $2^{30}$ bytes. Storage
-capacities are not reported in this table, but the number and type of storage drives is reported. This is because disk capacity does not impact performance, but aggregate
-disk bandwidth impacts performance. In our tests, the \texttt{hs1.8xlarge} instance is chosen to represent a workstation. Network bandwidth is constant across all instances.
+Table~\ref{tab:machines} describes the instance types. Memory capacity is reported in Gibibytes~(GiB), where 1 GiB is equal to $2^{30}$ bytes. Storage
+capacities are not reported in this table because disk capacity does not impact performance, but the number and type of storage drives is reported because aggregate
+disk bandwidth does impact performance. In our tests, the \texttt{hs1.8xlarge} instance is chosen to represent a workstation. Network bandwidth is constant across all instances.
 
 \begin{table}[h]
 \processtable{AWS Machine Types\label{tab:machines}}
@@ -500,13 +500,13 @@ disk bandwidth impacts performance. In our tests, the \texttt{hs1.8xlarge} insta
 
 As can be seen from these results, the ADAM pipeline is approximately twice as fast as current pipelines when running on a single node. Additionally, ADAM achieves
 speedup that is close to linear. This point is not clear from Table~\ref{tab:overview}, as we change instance types when also changing the number of instances used. To clarify,
-we present speedup plots for the NA12878 high coverage genome and the HG00096 low coverage genome~(16 GB BAM) in Figure~\ref{fig:speedup}. These speedup
+Figure~\ref{fig:speedup} presents speedup plots for the NA12878 high coverage genome and the HG00096 low coverage genome~(16 GB BAM). These speedup
 measurements are taken on a dedicated cluster of 82 machines where each machine has 24 Xeon cores, 128GB of RAM, and 12 disks.
 
 \begin{figure}[h]
 \begin{center}
-\includegraphics[width=0.49\linewidth]{graphs/speedup_na12878.pdf}
-\includegraphics[width=0.49\linewidth]{graphs/speedup_hg00096.pdf}
+\includegraphics[width=0.99\linewidth]{graphs/speedup_na12878.pdf}
+\includegraphics[width=0.99\linewidth]{graphs/speedup_hg00096.pdf}
 \end{center}
 \caption{Speedup when running \textit{Sort} and \textit{Mark Duplicates} on NA12878 and HG00096}
 \label{fig:speedup}
@@ -581,7 +581,7 @@ machines can be selected. Additionally, cloud platforms also frequently auction 
 \end{itemize}
 
 We anticipate that formats like ADAM will ease this transition, as ADAM can be used efficiently on all platforms. Additionally, ADAM's stack model explicitly allows for significant
-flexibility in the format. This will allow ADAM to easily adapt to any future computing revolutions.
+flexibility in the format, which will allow ADAM to easily adapt to future computing innovations.
 
 \subsection{Syntax vs. Semantics}
 \label{sec:syntax-vs-semantics}
@@ -592,7 +592,7 @@ representations that closely mirror the biological and algorithmic processes the
 
 The core of the ADAM project is focused on improving the syntax used for representing biological data. Our focus on semantics is limited to introducing semantic improvements
 for variant and genotype data that allows for better representation of joint called data and annotations~\S\ref{sec:adamvariant}. However, while we do not address the greater
-issues of semantics, we provide a clean platform for tacking these issues. This is because of the ADAM stack and its ability to support broader access and computational patterns.
+issues of semantics, we provide a clean platform for tacking these issues because of the ADAM stack and its ability to support broader access and computational patterns.
 For example, ADAM data can easily be accessed using relational databases like Shark and Impala~\citep{xin13shark, impala}. Additionally, ADAM can be used as the base
 of a graph-based data representation through GraphX~\citep{xin13graphx}. This design decision allows for the easy and clean extension of ADAM's semantics.
 
