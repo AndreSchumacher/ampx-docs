@@ -330,10 +330,18 @@ sample, or etc.
 
 Additionally, since annotations are defined through an explicit schema, annotation maintenance becomes significantly simpler.
 
-\paragraph{ADAM Sequence Dictionaries:}
+\paragraph{ADAM Sequence Dictionaries, Removes Global Ordering:}
 \label{sec:adam-sequence-dictionaries}
 
-\textbf{Timothy, can you write this?} \todo{Tim}
+One of the primary elements of the SAM/BAM header is the ``sequence dictionary,'' an ordered array containing the complete set of contigs to which the reads in the file are aligned.
+The sequence dictionary provides a global ordering to the records in the file (lexicographic ordering first on the order of the target contig within the sequence dictionary and second on the records position with respect to that contig), and allows equality and comparison checks between contigs to be implemented as integer rather than string operations.
+However, tools which require SAMs/BAMs in coordinate-sorted order often rely on the content \emph{and} ordering of the sequence dictionaries between the files to be preserved \citep*{gatk-ordering}, and fail when this requirement is not met.  
+Separate command-line tools are required to re-order the sequence dictionaries of multiple files into a common order \citep*{picard}.
+
+ADAM abstracts away the need for a global read ordering based on a sequence dictionary. 
+The contents of the sequence dictionary are embedded within the fields of the ADAMRecord itself, and each ADAM command and method implicitly takes this dictionary as a parameter.
+Comparison methods, such as the \emph{CompareAdam} tool for quantifying differences between pairs of ADAMRecord files, take two sequence dictionaries as parameters and dynamically translate between the dictionaries (if different) on-the-fly without the need to enforce a common global order.
+Finally, ADAM provides a set of classes and command-line utilities for reading, examining, and manipulating its logical contents of the sequence dictionary embedded within any ADAMRecord file.
 
 \subsection{Data Transformations}
 \label{sec:data-transformations}
