@@ -13,13 +13,13 @@
 \title[ADAM: Cloud Scale Genomic Processing]{ADAM: A Data Format And Pipeline For Cloud Scale Genomic Processing}
 \author[Massie and Nothaft \textit{et~al}]{Matt~Massie\,$^{1,\dagger,}$\footnote{These authors contributed equally.} , Frank~Austin~Nothaft\,$^{1,\dagger, *}$,
 Christopher~Hartl\,$^{2}$, Christos~Kozanitis\,$^1$, Andr\'{e}~Schumacher\,$^3$, Timothy~Danford\,$^4$, Carl~Yeksigian\,$^4$, Jey~Kottalam\,$^1$,
-Arun~Ahuja\,$^5$, Neal~Sidhwaney\,$^5$, Jeff~Hammerbacher\,$^5$, Michael Linderman\,$^5$, Anthony~D.~Joseph\,$^1$, and David~Patterson$\,^{1,}$\footnote{To whom
+Arun~Ahuja\,$^5$, Neal~Sidhwaney\,$^5$, Jeff~Hammerbacher\,$^5$, Michael D. Linderman\,$^5$, Anthony~D.~Joseph\,$^1$, and David~Patterson$\,^{1,}$\footnote{To whom
 correspondence should be addressed.}}
 \address{$^{1}$Department of Electrical Engineering and Computer Science, University of California, Berkeley, CA\\
 $^{2}$The Broad Institute of MIT and Harvard, Cambridge, MA\\
 $^{3}$International Computer Science Institute (ICSI), University of California, Berkeley, CA\\
 $^{4}$GenomeBridge, Cambridge, MA\\
-$^{5}$Carl Icahn School of Medicine at Mount Sinai, New York, NY}
+$^{5}$Icahn Institute for Genomics and Multiscale Biology, Icahn School of Medicine at Mount Sinai, New York, NY}
 
 \history{Received on XXXXX; revised on XXXXX; accepted on XXXXX}
 
@@ -30,9 +30,9 @@ $^{5}$Carl Icahn School of Medicine at Mount Sinai, New York, NY}
 \begin{abstract}
 
 \section{Motivation:}
-By using cloud computing services or large computing clusters to process genomic data, we can significantly decrease the cost and latency of genomic analysis. However,
-current genomics data formats and processing pipelines were introduced prior to many significant advances in cloud and cluster computing technologies. Through the careful
-design of new file formats, we can unlock the advantages of distributed computing and also ensure that the file formats can easily be optimized for future computing advances.
+Many new distributed computing technologies are now available to support performant, scalable, cost-efficient genomic data analysis. However,
+current genomics data formats and processing pipelines were developed prior to many of these technologies and so can't take advantage of their unique capabilities. Through the careful
+design of new file formats, we can exploit current distributed computing technologies and ensure genomic data and tools  can readily be optimized for future computing advances.
 
 \section{Results:} We introduce ADAM, a set of file formats and command line tools for processing genome data on clusters and in the cloud. On a high coverage~(60$\times$)
 250GB NA12878 BAM file, with ADAM we are able to perform Sorting and Duplicate Marking in under 50 minutes on a 100 node cloud-based cluster~(a 50$\times$
@@ -49,21 +49,15 @@ and the source is available through GitHub.
 \section{Introduction}
 \label{sec:introduction}
 
-As noted by \citet{mcpherson09}, the improvement of next generation sequencing~(NGS) methods has made data processing a bottleneck. This impediment has significant
-impact on scientists who are using genomics in a time-sensitive clinical setting, or who are working on very large datasets~(e.g., for genome wide association studies, GWAS,
-see~\citet{wang05}). The Sequence/Binary Alignment/Map~(SAM/BAM) and Variant Call Format~(VCF) file formats were designed before multi-node processing and cloud
-computing were in vogue, and were optimized for single node processing~\citep{li09}. However, the past five years have seen significant improvements in both hardware
-and software for distributed computing~\citep{barroso13}.
+The improvement of next generation sequencing~(NGS) methods has made data processing a bottleneck\citet{mcpherson09}, particularly for those working in time-sensitive clinical settings or with many thousands of samples. Numerous other industries, particularly in the web-space, have faced similar challenges and as result a number of new technologies have been developed to enable performant, scalable, cost-effective distributed computing~\citep{barroso13}. Key genomic file file formats, specifically Sequence/Binary Alignment/Map~(SAM/BAM) and Variant Call Format~(VCF), were designed before many of these distributed computing technologies were widely available and so are not designed to take advantage of their specific capabilities~\citep{li09,niemenmaa12}.
 
-Distributed processing can improve both the cost and latency of genomic processing. However, there are scalability limitations inherent to the BAM and VCF file formats that limit
-the performance improvements seen by distributing data over more than 8 nodes. This limitation is seen in \citet{niemenmaa12} and is discussed in
-more detail in ~\S\ref{sec:approach}. We choose to rethink file formats for genomics to unlock the advantages of distributed computing platforms, and to enable easy adjustment
-to future computing trends. We are guided by the following design goals:
+The design choices in BAM and VCF made to optimize for the tools and computing systems available at the time, such as a row/record-entric design and a single header, also limit scaling to larger distributed computing systems that do not provide shared storage~\citet{niemenmaa12}. We choose to reimplement the key genomic file formats to unlock the advantages of modern distributed computing platforms, and to enable easy adoption
+to future technologies. We are guided by the following design goals:
 
 \begin{itemize}
 \item Many genomics applications only access selective portions of data~(certain groups of records, or fields within records). Our new formats should support these access
 patterns when used as a flat file, and also when used as a database.
-\item Scientists collectively want to process data in several different programming languages. To avoid incompatibilities, it is important that our new formats are natively
+\item  To avoid incompatibilities across different programming languages, it is important that our new formats are natively
 supported across many programming languages.
 \item Genomic data will be processed on various computing systems, including single workstations, large dedicated clusters,
 and using cloud computing services. We must jointly optimize for these diverse platforms.
@@ -74,7 +68,7 @@ To address these problems, we introduce ADAM, a set of formats, application prog
 ADAM is fully open source under the Apache 2 license, and is implemented on top of Avro~\citep{avro} and Parquet~\citep{parquet} for data storage. Our reference pipeline
 is implemented on top of Spark, a high performance in-memory Map-Reduce system~\citep{zaharia10}. This combination provides an explicit data schema, enables
 natively compatible file access across many programming languages, improves the scalability of distributed applications, and reduces the disk I/O bottleneck faced by many
-contemporary genomics applications. These changes lead to significant performance improvements, and improve the format's cross-platform portability. On a single
+contemporary genomics applications. These changes lead to both performance and portability improvements. On a single
 node, we are able to speedup sort and duplicate marking by 2$\times$. More importantly, on a 250 Gigabyte~(GB) high~(60$\times$) coverage
 human genome, this system achieves a 50$\times$ speedup on a 100 node computing cluster, fulfilling the promise of scalability of ADAM.
 We provide an extensive review of ADAM's performance in~\S\ref{sec:performance}.
@@ -93,17 +87,15 @@ in~\S\ref{sec:methods}. Finally, we provide a comprehensive comparison of ADAM a
 \section{Approach}
 \label{sec:approach}
 
-As we noted in the introduction, instead of trying to extend the BAM and VCF file formats, we choose to re-imagine these formats. Despite several attempts to adapt the
-BAM and VCF file formats for distributed processing~\citep[see][]{niemenmaa12}, they have been limited in their ability to scale to larger cluster sizes due to several issues
-intrinsic to BAM and VCF:
+As we noted in the introduction, instead of trying to extend the BAM and VCF file formats, we choose to re-imagine these formats. Previous attempts to adapt the
+BAM and VCF file formats for distributed processing~\citep[see][]{niemenmaa12} have identified following properties as limiting scaling to larger cluster sizes:
 
 \begin{itemize}
 \item BAM and VCF both depend on centralized headers, which must be globally distributed; and
 \item BAM and VCF both have irregular record sizes, which limits the efficiency of row-parallel reading. 
 \end{itemize}
 
-These characteristics limit the performance of applications that desire parallel access to all records of a BAM or VCF file. However, this points at another problem: traditional
-flat file formats are not ideal for genomics. Traditional flat file formats do not provide:
+Further these flat files formats do not provide other characteristics that are desirable in genomic analyses:
 
 \begin{itemize}
 \item \textbf{Database Queries:} Extending BAM to support standard database queries required a significant extension~\citep{kozanitis13}.
@@ -116,14 +108,14 @@ are based on position-independent data~(e.g. mapping quality, Boolean flags) and
 statistics collection tools like SAMtools' \texttt{flagstat}~\citep{li09}. Row-oriented formats like BAM and VCF cannot support these access patterns.
 \end{itemize}
 
-Moving forward, we seek to meet two major goals: we want to provide an extensible architecture that will allow for efficient future extension of the
-file format, and we want to provide an initial implementation of that architecture that addresses the problems introduced above. In the remainder
+We seek to provide an extensible architecture that will allow for efficient future extension of key genomic 
+file formats, and an initial implementation of that architecture that addresses the limitations/needs introduced above. In the remainder
 of this section, we review our high-level architecture that provides extensibility, and then we provide a technical overview of our reference pipeline.
 
 \subsection{Architectural Overview}
 \label{sec:architectural-overview}
 
-Our primary criticisms of BAM and VCF are that the formats are difficult to specialize for certain processing patterns without
+The BAM and VCF formats are difficult to specialize for certain processing patterns without
 changing the implementation of the formats themselves. This issue is similar to the problems addressed during the development of the Open
 Systems Interconnection~(OSI) model and Internet Protocol~(IP) stack for networking services~\citep{zimmermann80}. The developers
 of the OSI model and the IP stack needed to make many different technologies and systems function in unison---to do this, they introduced the
@@ -173,7 +165,7 @@ tool or vendor lock-in.
 
 A well defined software stack has several other significant advantages. By limiting application interactions with layers lower than the presentation layer,
 application developers are given a clear and consistent view of the data they are processing, and this view of the data is independent of whether the data
-is local or distributed across a cluster or cloud. By separating the API from the data access layer, we unlock significant flexibility. With careful design in the data
+is local or distributed across a cluster or cloud. By separating the API from the data access layer, we improve flexibility. With careful design in the data
 format and data access layers, we can seamlessly support conventional flat file access patterns, while also allowing easy access to data with database methods.
 By treating the compute substrate and storage as separate layers, we also drastically increase the portability of the APIs that we implement.
 
@@ -220,7 +212,7 @@ of fields. Parquet has other benefits:
 
 \begin{itemize}
 \item Parquet operates by splitting a single dataset into many smaller files that contain \emph{row groups}\footnote{In Parquet, a \emph{row group} contains a subset
-of rows of data from the dataset. The row groups are then stored in columnar format.}. This division enables both parallelism by column and by row which increases read
+of rows of data from the dataset. The row groups are then stored in columnar format.}. This division enables both parallelism by column and by row which increases overall read
 parallelism.
 \item Parquet provides \emph{predicate pushdown}, where user defined filters are applied while records are being read. This feature can lead to a $>$2$\times$ performance increase.
 A detailed analysis of Parquet's predicate pushdown functions for genomics applications can be found in \citet{massie13}.
@@ -303,6 +295,8 @@ disambiguates the length of a deletion or insertion.
 We realize that many users are interested in viewing bases through the traditional pileup view. We provide an internal representation~(\textit{ADAMRod}) that provides
 efficient access to this data.
 
+% The 2nd sentence needs a lot of work, it is too vague
+
 Additionally, we provide \emph{pileup aggregation}, a technique that is similar to \texttt{ReducedReads}~\citep[see][]{mckenna10}. Pileup aggregation takes all bases that
 share a base type~(e.g., cytosine, guanine, etc.), and averages their statistical values. This technique is useful in some circumstances~(e.g., data archival) as it leads to a
 reduction in the amount of data stored that scales approximately as $O(1/coverage)$.
@@ -317,12 +311,13 @@ variant calls for a subset of these samples; this subset may span multiple varia
 to compute variant statistics from a set of genotypes without having access to the raw read data. This transformation is implemented in both the \texttt{adam-cli} and the
 \texttt{adam-core} API.
 
-Annotations are not a first class citizen of the VCF format---annotations are shoehorned in to the format through the use of the attributes field. For ADAMGenotypes and
+Annotations are not a first class citizen of the VCF format---annotations are shoehorned into the format through the use of the INFO field. For ADAMGenotypes and
 ADAMVariants, we allow users to define record schemas that are not part of the core variant/genotype schemas. We then additionally provide an internal ADAMVariantContext
 class that unifies annotations with specific genotypes and variants. Annotations are typically unified through the use of user defined \emph{joins}, which are a database
 construct. There are several advantages to this process:
 
 \begin{itemize}
+% What does "complex" mean here, I think you want to say data can be annotated in a natural representation, i.e. records don't need to be flattened to strings.
 \item Since users are defining records for annotations, annotated data can now be more complex---specifically, annotated data can contain multiple fields, or complex fields.
 \item As the \emph{joins} are user defined, no limitations are placed on the forms of annotations that are provided. Annotations can be specific to a site, variant, genotype,
 sample, or etc.
@@ -570,11 +565,13 @@ how ADAM enables this evolution. Finally, we discuss the design decisions and pr
 \subsection{Single Node Processing vs. Dedicated Clusters vs. Cloud Computing}
 \label{sec:single-vs-clusters-vs-cloud}
 
+% This first sentence is content free - what "patterns"?
 A central goal during the development of ADAM was to not force users to follow specific patterns. As such, we have also made efforts to design the ADAM format and command
 line utilities to be portable across different computing installations. We envision that end users will be using ADAM on single workstations, dedicated computing
 clusters, or through a cloud computing provider like Amazon EC2, Google Compute Engine, or Microsoft Azure. As can be seen in~\S\ref{sec:performance}, ADAM performs
 admirably on all platforms, achieving a 2$\times$ speedup over the current state-of-the-art on a single node, and near-linear speedup when distributed.
 
+% I use a cluster everday, you must be more specific here, more generally, I think you are losing the main point here. You don't need a pitch for cloud computing here. Instead is the point that you really want to make that the cloud makes it more difficult to implement traditional shared memory clusters.
 As traditional genomics workflows could not easily or efficiently use compute clusters, many users have performed the bulk of their processing on beefy workstations. We predict
 that the rise of distributed computing tools for genomics will soon render workstations unattractive. Instead, we expect that clinical/research centers will either process
 consistently high volumes of genomic data and build and maintain their own dedicated compute farms, or will use a cloud computing platform for infrequent data processing
@@ -594,6 +591,7 @@ flexibility in the format, which will allow ADAM to easily adapt to future compu
 \subsection{Syntax vs. Semantics}
 \label{sec:syntax-vs-semantics}
 
+% I think this should all be moved to introduction, it provides a great vehicle for setting the theme of adapting the semantics of these formats with a new syntax.
 When developing a new genomics file format, it is important to address both the problems of syntax and semantics. A format that is \emph{syntactically good} will be easily
 adaptable to multiple platforms, provide good programming abstractions and APIs, and will be performant. A format that is \emph{semantically good} will provide data
 representations that closely mirror the biological and algorithmic processes they represent.
@@ -607,6 +605,7 @@ of a graph-based data representation through GraphX~\citep{xin13graphx}. This de
 \subsection{Evolution of Standard}
 \label{sec:evolution-of-standard}
 
+% What is the process that should be followed? Don't leave hangers...
 ADAM's read, pileup, variant, and genotype formats are designed to evolve easily. The formats are simple to evolve because they are expressed as an explicit schema
 in Avro. Avro allows for an application that has been compiled against a specific version of the schema to read data that has been written in an older or newer version of the
 schema, as long as a simple process is followed when updating the schema.
@@ -616,18 +615,21 @@ the SAM/BAM format. For variant and genotype data, our variant context implement
 defining new fields. The variant context method is superior to the annotations provided by the VCF standard, as it provides higher expressivity while promoting better
 organization.
 
-ADAM is a community effort, and all members of the greater bioinformatics community are invited to modify both the data formats and the processing pipelines. The ADAM team
-has established a Request For Comment~(RFC) system that is similar to the one used by the Internet Engineering Task Force~(IETF). Here, modifications are proposed and
-opened for public discussion for a set time frame. After a consensus is reached, the format can be amended. The RFC platform is hosted at our project
-website~(\url{http://adam.cs.berkeley.edu/rfc}).
+% I think this is getting ahead of yourself, I would delete
+%ADAM is a community effort, and all members of the greater bioinformatics community are invited to modify both the data formats and the processing pipelines. The ADAM team
+%has established a Request For Comment~(RFC) system that is similar to the one used by the Internet Engineering Task Force~(IETF). Here, modifications are proposed and
+%opened for public discussion for a set time frame. After a consensus is reached, the format can be amended. The RFC platform is hosted at our project
+%website~(\url{http://adam.cs.berkeley.edu/rfc}).
 
 \section{Conclusion}
 \label{sec:conclusion}
 
 This paper presents ADAM, a new data storage format and processing pipeline for genomics data. Our reference implementation makes use of efficient columnar storage
-systems to improve the lossless compression available for storing read data, and uses in-memory processing techniques to eliminate the read processing bottleneck faced by
+systems to improve the lossless compression available for storing read data, and uses in-memory processing techniques to eliminate the I/O bottlenecks faced by
 modern genomics pipelines. We also present APIs that enhance developer access to read, pileup, genotype, and variant data.
 
+% what is SQL querying, that is a "term" without a definition, do you mean query with SQL
+% This paragraph needs a lot of work.
 We are currently in the process of extending ADAM to support SQL querying of genomic data, and extending our transformations API to more programming languages. 
 ADAM promises to improve the development of applications that process genomic data, by removing current difficulties with the extraction and loading of data and by
 providing simple and performant programming abstractions for processing this data at scale.
