@@ -49,9 +49,9 @@ and the source is available through GitHub.
 \section{Introduction}
 \label{sec:introduction}
 
-The improvement of next generation sequencing~(NGS) methods has made data processing a bottleneck\citet{mcpherson09}, particularly for those working in time-sensitive clinical settings or with many thousands of samples. Numerous other industries, particularly in the web-space, have faced similar challenges and as result a number of new technologies have been developed to enable performant, scalable, cost-effective distributed computing~\citep{barroso13}. Key genomic file file formats, specifically Sequence/Binary Alignment/Map~(SAM/BAM) and Variant Call Format~(VCF), were designed before many of these distributed computing technologies were widely available and so are not designed to take advantage of their specific capabilities~\citep{li09,niemenmaa12}.
+The improvement of next generation sequencing~(NGS) methods has made data processing a bottleneck~\citep{mcpherson09}, particularly for those working in time-sensitive clinical settings or with many thousands of samples. Numerous other industries, particularly in the web-space, have faced similar challenges and as result a number of new technologies have been developed to enable performant, scalable, cost-effective distributed computing~\citep{barroso13}. Key genomic file file formats, specifically Sequence/Binary Alignment/Map~(SAM/BAM) and Variant Call Format~(VCF), were designed before many of these distributed computing technologies were widely available and so are not designed to take advantage of their specific capabilities~\citep{li09,niemenmaa12}.
 
-The design choices in BAM and VCF made to optimize for the tools and computing systems available at the time, such as a row/record-entric design and a single header, also limit scaling to larger distributed computing systems that do not provide shared storage~\citet{niemenmaa12}. We choose to reimplement the key genomic file formats to unlock the advantages of modern distributed computing platforms, and to enable easy adoption
+The design choices in BAM and VCF made to optimize for the tools and computing systems available at the time, such as a row/record-centric design and a single header, also limit scaling to larger distributed computing systems that do not provide shared storage~\citet{niemenmaa12}. We choose to reimplement the key genomic file formats to unlock the advantages of modern distributed computing platforms, and to enable easy adoption
 to future technologies. We are guided by the following design goals:
 
 \begin{itemize}
@@ -65,7 +65,7 @@ and using cloud computing services. We must jointly optimize for these diverse p
 \end{itemize}
 
 To address these problems, we introduce ADAM, a set of formats, application programming interfaces~(APIs), and processing stage implementations for genomic data.
-ADAM is fully open source under the Apache 2 license, and is implemented on top of Avro~\citep{avro} and Parquet~\citep{parquet} for data storage. Our reference pipeline
+ADAM is fully open source under the Apache 2 license, and is implemented on top of Avro\footnote{\url{http://avro.apache.org}} and Parquet\footnote{\url{http://www.parquet.io}} for data storage. Our reference pipeline
 is implemented on top of Spark, a high performance in-memory Map-Reduce system~\citep{zaharia10}. This combination provides an explicit data schema, enables
 natively compatible file access across many programming languages, improves the scalability of distributed applications, and reduces the disk I/O bottleneck faced by many
 contemporary genomics applications. These changes lead to both performance and portability improvements. On a single
@@ -148,12 +148,17 @@ straightforward methods for querying the characteristics of individual portions 
 \item {\bf Application:} Applications like variant calling and alignment are implemented in this layer.
 \end{enumerate}
 
-The ADAM schema is represented using Apache Avro~\citep{avro}, an open-source, cross-platform data serialization framework similar
-to Apache Thrift and Google's Protocol Buffers~\citep{thrift, protobuf}. Avro was chosen as the interchange format for several reasons:
+% NOTE: This is redudant since almost the same text appears earlier except
+% the Thrift and Protobuf references, which do not add much information/context
+% for this paper (IMHO, Andre).
+%
+%The ADAM schema is represented using Apache Avro, an open-source, cross-platform data serialization framework similar
+%to Apache Thrift and Google's Protocol Buffers~\citep{thrift, protobuf}.
+Apache Avro was chosen for the ADAM interchange data format for several reasons:
 
 \begin{itemize}
 \item Avro is an open-source framework covered by the Apache 2 license, which means that Avro can be used with both open and closed source software.
-\item Avro has broad cross-platform support. Natively, Avro supports C/C++/C\#, Java, Scala, Python, Ruby, and php.
+\item Avro has broad cross-platform support. Natively, Avro supports C/C++/C\#, Java, Scala, Python, Ruby, and PHP.
 \item Avro provides a clear and human readable language for explicitly describing the schema of an object~(Avro Description Language, AVDL).
 \item Avro is natively supported by several common Map-Reduce frameworks and database systems.
 \item Avro schemas can be updated without breaking compatibility with objects written using a previous version of the schema.
@@ -176,16 +181,16 @@ We present a reference implementation of a read processing pipeline~(\texttt{ada
 and is designed for a distributed, in-memory Map-Reduce framework. We do not optimize for a specific computing platform---rather, we have designed
 agnostically for commodity clusters and for cloud computing platforms. We discuss this decision in~\S\ref{sec:single-vs-clusters-vs-cloud}. Our reference
 implementation provides several read processing stages that can be either run from a command line, or executed by another application through
-an API, as well as an API for enriched datatypes. These APIs are similar to those provided by SAMtools~\citep{li09} and Picard~\citep{picard}.
+an API, as well as an API for enriched datatypes. These APIs are similar to those provided by SAMtools~\citep{li09} and Picard\footnote{\url{http://picard.sourceforge.org}}.
 
 As mentioned in~\S\ref{sec:introduction}, we built our system using the Avro data serialization format, the Parquet columnar store, and the Spark Map-Reduce
-framework~\citep{avro, parquet, zaharia10}. We have already explained the reason for using Avro, we now give the rationale for using Spark and Parquet.
+framework. We have already explained the reason for using Avro, we now give the rationale for using Spark and Parquet.
 
 \paragraph{Spark, In-Memory Map-Reduce:}
 \label{sec:spark}
 
 Apache Spark is an in-memory, distributed Map-Reduce framework that was introduced in \citet{zaharia10} and further described in \citet{zaharia12}.
-Although it is compatible with the Hadoop~\citep{hadoop} ecosystem, Spark differs from conventional implementations of the Map-Reduce framework
+Although it is compatible with the Hadoop~\citep{white09} ecosystem, Spark differs from conventional implementations of the Map-Reduce framework
 originally proposed by Google in \citet{dean08}, since it avoids writing data to disk whenever possible and instead caches
 data in memory. This optimization provides a dramatic speedup for iterative computations---Spark sees a 30--100$\times$ speedup on iterative jobs by eliminating
 disk I/O and by improving resource utilization by pipelining computation. This pattern is a good fit for genomics because:
@@ -249,10 +254,10 @@ that we provide. Additionally, we describe the \texttt{adam-cli} toolkit and \te
 \subsection{Data Format and Schema}
 \label{sec:data-format-and-schema}
 
-The data representation for the ADAM format is described using the open source Apache Avro data serialization system~\citep{avro}. The Avro system also provides a human
+The data representation for the ADAM format is described using the open source Apache Avro data serialization system. The Avro system also provides a human
 readable schema description language that can auto-generate the schema implementation in several common languages including C/C++/C\#, Java/Scala, php, Python, and
 Ruby. This flexibility provides a significant cross-compatibility advantage over the BAM/SAM format, where the data format has only been implemented for C/C++ through
-SAMtools~\citep{li09} and for Java through Picard~\citep{picard}. Additionally, there are known incompatibilities between these different implementations---by using Avro,
+SAMtools~\citep{li09} and for Java through Picard. Additionally, there are known incompatibilities between these different implementations---by using Avro,
 we eliminate these and future platform compatibility issues.
 
 The data types presented in this section make up the narrow waist of our proposed genomics stack in Figure \ref{fig:stack-model}. We provide the following primary datatypes:
@@ -330,8 +335,8 @@ Additionally, since annotations are defined through an explicit schema, annotati
 
 One of the primary elements of the SAM/BAM header is the ``sequence dictionary,'' an ordered array containing the complete set of contigs to which the reads in the file are aligned.
 The sequence dictionary provides a global ordering to the records in the file (lexicographic ordering first on the order of the target contig within the sequence dictionary and second on the records position with respect to that contig), and allows equality and comparison checks between contigs to be implemented as integer rather than string operations.
-However, tools which require SAMs/BAMs in coordinate-sorted order often rely on the content \emph{and} ordering of the sequence dictionaries between the files to be preserved \citep*{gatk-ordering}, and fail when this requirement is not met.  
-Separate command-line tools are required to re-order the sequence dictionaries of multiple files into a common order \citep*{picard}.
+However, tools which require SAMs/BAMs in coordinate-sorted order often rely on the content \emph{and} ordering of the sequence dictionaries between the files to be preserved\footnote{See, for example, \url{http://www.broadinstitute.org/gatk/guide/article?id=1204}}, and fail when this requirement is not met.  
+Separate command-line tools are required to re-order the sequence dictionaries of multiple files into a common order.
 
 ADAM abstracts away the need for a global read ordering based on a sequence dictionary. 
 The contents of the sequence dictionary are embedded within the fields of the ADAMRecord itself, and each ADAM command and method implicitly takes this dictionary as a parameter.
@@ -581,7 +586,7 @@ needs. The benefits of cloud computing include:
 \item Commercial cloud platforms are economically attractive as they do not present any capital acquisition costs, nor do they have maintenance costs.
 \item Additionally, cloud platforms tend to offer several levels of service differentiation. Users can trade cost for performance, as the number of machines and performance of
 machines can be selected. Additionally, cloud platforms also frequently auction unused slots off at below-market prices~(\emph{spot instances}, which can further reduce costs.
-\item System setup can be simplified through the use of systems like \textit{Docker}~\citep{docker} for distributing consistent application images.
+\item System setup can be simplified through the use of systems like \textit{Docker}\footnote{\url{https://www.docker.io/}} for distributing consistent application images.\todo{Is mentioning Docker here really useful/relevant?}
 \item Inexpensive pay-as-you-go storage solutions are available which provide good performance when used with a cloud service.
 \end{itemize}
 
@@ -599,7 +604,7 @@ representations that closely mirror the biological and algorithmic processes the
 The core of the ADAM project is focused on improving the syntax used for representing biological data. Our focus on semantics is limited to introducing semantic improvements
 for variant and genotype data that allows for better representation of joint called data and annotations~\S\ref{sec:adamvariant}. However, while we do not address the greater
 issues of semantics, we provide a clean platform for tacking these issues because of the ADAM stack and its ability to support broader access and computational patterns.
-For example, ADAM data can easily be accessed using relational databases like Shark and Impala~\citep{xin13shark, impala}. Additionally, ADAM can be used as the base
+For example, ADAM data can easily be accessed using relational databases like Shark~\citep{xin13shark} and Impala\footnote{\url{http://www.cloudera.com/content/cloudera/en/products/cdh/impala.html}}. Additionally, ADAM can be used as the base
 of a graph-based data representation through GraphX~\citep{xin13graphx}. This design decision allows for the easy and clean extension of ADAM's semantics.
 
 \subsection{Evolution of Standard}
